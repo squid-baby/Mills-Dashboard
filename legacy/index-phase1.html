@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mills Rentals Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #09090b; color: #f4f4f5; font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+  input, select, button { font-family: inherit; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #18181b; }
+  ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+  ::selection { background: #3b82f6; color: #fff; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script>
+// ─── Shorthand ──────────────────────────────────────────────────────────────
+const e = React.createElement;
+const { useState, useMemo, useCallback, useEffect, useRef } = React;
+
+// ─── DATA (78 real units) ───────────────────────────────────────────────────
+const UNITS = [{"id":1,"address":"#17 Cedar Court Apartments","leaseEnd":"7/31/26","beds":2,"owner":"Jim","area":"Carrboro","group":"renewed","substate":"Renewal signed","notes":"","turnoverNotes":"","residents":[{"name":"Sofia A. Alba","email":"sofiaalba@outlook.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Andrew Ehrler","email":"andrewehrler@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":true},
+{"id":2,"address":"#24 Cedar Court Apartments","leaseEnd":"7/31/26","beds":1,"owner":"Jim","area":"Carrboro","group":"renewed","substate":"Renewal signed","notes":"1/2 sent renewal lease","turnoverNotes":"","residents":[{"name":"Sarah Dickson","email":"sarahrossdickson@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":true},
+{"id":3,"address":"#27 Cedar Court Apartments","leaseEnd":"7/31/26","beds":1,"owner":"Jim","area":"Carrboro","group":"renewing","substate":"Interested, lease not yet sent","notes":"Said that she has no plans to move next year","turnoverNotes":"","residents":[{"name":"Alyssa C. Smith","email":"alyssacorinnesmith@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":4,"address":"100 A Hanna St","leaseEnd":"5/31/26","beds":2,"owner":"Nate and Amanda","area":"Carrboro","group":"partial_turn","substate":"Partial turn - some staying, some leaving","notes":"Reach out in January","turnoverNotes":"","residents":[{"name":"Lauren M. Rekhelman","email":"laurenrekhelman@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Elyse Jenkins","email":"Elyse.c.jenkins@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":5,"address":"100 B Hanna St","leaseEnd":"7/31/26","beds":3,"owner":"Nate and Amanda","area":"Carrboro","group":"renewing","substate":"Some confirmed renewing, some unknown","notes":"10/20 said they were unsure if it would be 3 people or just Hannah and Avery","turnoverNotes":"","residents":[{"name":"Carlee Friar","email":"carleefriar@unc.edu","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"Hannah B. Burgess","email":"burgess_hannah@icloud.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Avery White","email":"averygrahamwhite@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":6,"address":"1010 South Columbia","leaseEnd":"4/30/26","beds":1,"owner":"Brian","area":"Purefoy","group":"renewing","substate":"Interested, lease not yet sent","notes":"","turnoverNotes":"","residents":[{"name":"Shane Hartman","email":"swangin2@yahoo.com","status":"renewing","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":7,"address":"103 A North St","leaseEnd":"6/30/26","beds":2,"owner":"Carolyn","area":"North of Campus","group":"renewed","substate":"Renewal signed","notes":"8/31 - talked to Carolyn about painting and possibly replacing floors in kitchen at next turn","turnoverNotes":"","residents":[{"name":"Jack Herr","email":"jackh.13@icloud.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Tobin Smith","email":"tobinleesmith@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":true},
+{"id":8,"address":"103 B North St","leaseEnd":"5/31/26","beds":3,"owner":"Carolyn","area":"North of Campus","group":"partial_turn","substate":"Partial turn - some staying, some leaving","notes":"","turnoverNotes":"","residents":[{"name":"Tara Cooleen","email":"tlc0234@optonline.net","status":"leaving","leaseSigned":true,"depositPaid":false},{"name":"Liana E. Riachi","email":"liana@mcoulspub.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Danny Govea","email":"dangovea@ad.unc.edu","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":false},
+{"id":9,"address":"104 # 3 W Main St","leaseEnd":"5/31/26","beds":1,"owner":"Jim","area":"Carrboro","group":"unknown","substate":"Waiting to hear back","notes":"Just got a full repaint (2020) fixed AC return","turnoverNotes":"","residents":[{"name":"Violet Yang","email":"fuyang@unc.edu","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":10,"address":"104 # 4 W Main St","leaseEnd":"7/31/26","beds":2,"owner":"Carolyn","area":"Carrboro","group":"unknown","substate":"Waiting to hear back","notes":"Emailed 10/23","turnoverNotes":"","residents":[{"name":"Benjamin B. Campion","email":"bencampion72@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"Maura A. Toole","email":"toole.maura@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":11,"address":"105 A North St","leaseEnd":"5/31/26","beds":3,"owner":"Carolyn","area":"North of Campus","group":"partial_turn","substate":"Partial turn - some staying, some leaving","notes":"","turnoverNotes":"","residents":[{"name":"Laiken Christman","email":"laikenec7@yahoo.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Sydney Timberlake","email":"stimberlake804@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Brooke Szczypinski","email":"brookeski13@gmail.com","status":"leaving","leaseSigned":true,"depositPaid":false}],"nextResidents":[],"allSigned":true,"allDeposit":false},
+{"id":12,"address":"105 B North St","leaseEnd":"5/31/26","beds":3,"owner":"Carolyn","area":"North of Campus","group":"partial_turn","substate":"Partial turn - some staying, some leaving","notes":"","turnoverNotes":"","residents":[{"name":"Haley Carson","email":"haleycarson05@icloud.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Ainsley Heath","email":"ainsley.heath@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Erika Allison","email":"Erika_allison@yahoo.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":13,"address":"109 North St","leaseEnd":"5/31/26","beds":2,"owner":"Carolyn","area":"North of Campus","group":"partial_turn","substate":"Partial turn - some staying, some leaving","notes":"Told her she could have until the end of December followed up 1/3","turnoverNotes":"","residents":[{"name":"Katherine Moran","email":"katherinemoran828@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Pakiza Mammadli","email":"mammadlipakiza@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":14,"address":"110 A Mallette","leaseEnd":"5/31/26","beds":4,"owner":"Carolyn","area":"North of Campus","group":"renewing","substate":"Interested, lease not yet sent","notes":"Carolyn mentioned remodeling kitchens here in two years (2025)","turnoverNotes":"","residents":[{"name":"Mattie Wright","email":"mattiewright605@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Adeti Mohanslevan","email":"amdeets23@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Kie Mandelzis","email":"kmandelzis@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Ginger Wagner","email":"ginger.wagner.06@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":15,"address":"110 B Mallette","leaseEnd":"5/31/26","beds":4,"owner":"Carolyn","area":"North of Campus","group":"renewing","substate":"Interested, lease not yet sent","notes":"Carolyn mentioned remodeling kitchens here in two years (2025)","turnoverNotes":"","residents":[{"name":"Sobia Reid","email":"sobiareid@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Olivia Estes","email":"ojestes@unc.edu","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Emma Sitterle","email":"esitterleunc@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Samantha Brenneman","email":"samanthacb27@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":16,"address":"110 Fidelity","leaseEnd":"5/31/26","beds":4,"owner":"Nate and Amanda","area":"Carrboro","group":"renewing","substate":"Interested, lease not yet sent","notes":"","turnoverNotes":"","residents":[{"name":"Madison Haley","email":"madisonclaiire@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Carolina Ramsey","email":"ramseycarolina@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Shreeya Garg","email":"shreeyagarg@berkeley.edu","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Amanda Haik","email":"ahaik13@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":17,"address":"1101 A N Greensboro","leaseEnd":"3/31/26","beds":1,"owner":"Nate and Amanda","area":"Carrboro","group":"renewing","substate":"Renewal lease sent, not all signed","notes":"","turnoverNotes":"","residents":[{"name":"Roger D. Belanger","email":"rogerbelan@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":false}],"nextResidents":[],"allSigned":true,"allDeposit":false},
+{"id":18,"address":"1101 B N Greensboro","leaseEnd":"1/31/26","beds":1,"owner":"Nate and Amanda","area":"Carrboro","group":"renewing","substate":"Interested, lease not yet sent","notes":"","turnoverNotes":"","residents":[{"name":"Brady Stewart","email":"bfurthur@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":19,"address":"1101 C N Greensboro","leaseEnd":"10/31/26","beds":1,"owner":"Nate and Amanda","area":"Carrboro","group":"renewed","substate":"Renewal signed","notes":"","turnoverNotes":"","residents":[{"name":"Florisel Ordonez","email":"ordonezf072@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":true},
+{"id":20,"address":"1101 D N Greensboro","leaseEnd":"7/31/26","beds":1,"owner":"Nate and Amanda","area":"Carrboro","group":"full_turnover","substate":"Needs to be listed","notes":"","turnoverNotes":"","residents":[{"name":"Ben Gear","email":"Bgear238@icloud.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":21,"address":"111 A Howell St","leaseEnd":"5/31/26","beds":2,"owner":"Nate and Amanda","area":"Purefoy","group":"unknown","substate":"Waiting to hear back","notes":"","turnoverNotes":"","residents":[{"name":"Jordan M. VanOrmer","email":"jordanvanormer@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"Garvey Eshet","email":"gavry.eshet@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":22,"address":"111 A/B North St","leaseEnd":"5/31/26","beds":5,"owner":"Carolyn","area":"North of Campus","group":"full_turnover","substate":"Needs to be listed","notes":"","turnoverNotes":"Replaced carpet (2020) full paint out (2020)","residents":[{"name":"Tara M. Hynes","email":"thynes110@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Bridget K. Grazel","email":"bridgetgrazel@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Genevieve Rickey","email":"Genrickey@icloud.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Jessica E. Dreyer","email":"jdreyer05@icloud.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Madelyn D. Sheridan","email":"maddysheridan24@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":23,"address":"111 B Howell St","leaseEnd":"7/31/26","beds":2,"owner":"Nate and Amanda","area":"Purefoy","group":"unknown","substate":"Waiting to hear back","notes":"Nathan wants to do a bathroom remodel here next turnover","turnoverNotes":"Replace countertops","residents":[{"name":"John M. Wadington","email":"jwadington@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"Christiaan Huibert Alphons Janssen","email":"christiaanj001@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":24,"address":"111 C Howell St","leaseEnd":"7/31/26","beds":2,"owner":"Nate and Amanda","area":"Purefoy","group":"renewed","substate":"Renewal signed","notes":"","turnoverNotes":"","residents":[{"name":"Dominic Lopez","email":"Domjace11@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Blair Hamilton","email":"tohrran@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":true},
+{"id":25,"address":"111 C North St","leaseEnd":"5/31/26","beds":3,"owner":"Carolyn","area":"North of Campus","group":"full_turnover","substate":"Needs to be listed","notes":"","turnoverNotes":"","residents":[{"name":"Benjamin Kimmel","email":"benjaminskimmel@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Troy Smith","email":"troywsmith3604@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Ethan Joyner","email":"etjoyner@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":26,"address":"111 D Howell St","leaseEnd":"5/31/26","beds":2,"owner":"Nate and Amanda","area":"Purefoy","group":"unknown","substate":"Waiting to hear back","notes":"","turnoverNotes":"","residents":[{"name":"Stefani Aleman","email":"stefani_aleman@med.unc.edu","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"Patrick C. Brown","email":"patrick.brown@unchealth.unc.edu","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":27,"address":"111 E Howell St","leaseEnd":"5/31/26","beds":2,"owner":"Nate and Amanda","area":"Purefoy","group":"unknown","substate":"Waiting to hear back","notes":"Asked to have until mid-feb","turnoverNotes":"","residents":[{"name":"Summer K. Peterson","email":"skpeterson527@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"James A. Kiessling","email":"james_kiessling@outlook.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":28,"address":"111 F Howell St","leaseEnd":"5/31/26","beds":3,"owner":"Nate and Amanda","area":"Purefoy","group":"partial_turn_leased","substate":"Partial turn - lease side done","notes":"Asked to wait to December reached back out 1/3","turnoverNotes":"","residents":[{"name":"Caroline M. Keesler","email":"keeslercaroline@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Abigail D. Meyer","email":"abbyyymeyer@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Hrithika Chittanuru","email":"hrithika.chit@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":29,"address":"111 G Howell St","leaseEnd":"5/31/26","beds":2,"owner":"Nate and Amanda","area":"Purefoy","group":"partial_turn","substate":"Partial turn - some staying, some leaving","notes":"","turnoverNotes":"","residents":[{"name":"Katalina Kokas","email":"kokas.katalina@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Joseph Lee","email":"leejoseph8238@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":30,"address":"112 Fidelity St","leaseEnd":"7/31/26","beds":3,"owner":"Nate and Amanda","area":"Carrboro","group":"unknown","substate":"Waiting to hear back","notes":"","turnoverNotes":"","residents":[{"name":"Harper Lee Greene","email":"","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"Russell J. Greene","email":"rnhgreene@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"Heather L. Greene","email":"greenehaus22@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":31,"address":"113 A Howell St","leaseEnd":"7/31/26","beds":4,"owner":"Nate and Amanda","area":"Purefoy","group":"renewed","substate":"Renewal signed","notes":"","turnoverNotes":"","residents":[{"name":"Bonnie D. Hernandez","email":"bonniedulce2005@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Adilene Garcia-Molina","email":"adilenegarciamolina@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Evelyn G. Huntley","email":"ehuntleycollege@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Osvaldo Linares","email":"osvidosh@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":true},
+{"id":32,"address":"113 B Howell St","leaseEnd":"6/30/26","beds":4,"owner":"Nate and Amanda","area":"Purefoy","group":"unknown","substate":"Waiting to hear back","notes":"Said unknown on November 7th","turnoverNotes":"","residents":[{"name":"Simantika Roy","email":"simantika.r06@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"Taraneh Sadritabrizi","email":"taranehsadri@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"Lok Tung Chui (Don)","email":"chuidondon@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"Cindy Zhang","email":"xindizhang129@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":33,"address":"113 C Howell St","leaseEnd":"7/31/26","beds":2,"owner":"Nate and Amanda","area":"Purefoy","group":"full_turnover","substate":"Needs to be listed","notes":"Told them on Dec 2 we would check back in next month","turnoverNotes":"","residents":[{"name":"Steven V. Lugo","email":"lugo_steven@yahoo.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Justin G. Villela Gibbs","email":"jvillelagibbs@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":34,"address":"113 North St","leaseEnd":"5/31/26","beds":2,"owner":"Carolyn","area":"North of Campus","group":"turnover_rented","substate":"New tenant found, lease in progress","notes":"Waiting for lease to be signed","turnoverNotes":"","residents":[{"name":"Tristen Odham","email":"tristenodham@gmail.com","status":"leaving","leaseSigned":true,"depositPaid":true},{"name":"Thomas Bowman","email":"bowmanthomas487@gmail.com","status":"leaving","leaseSigned":true,"depositPaid":true}],"nextResidents":[{"name":"Benjamin Kimmel","email":"benjaminskimmel@gmail.com","phone":"(704) 718-7402"},{"name":"Ben Little","email":"bflittle24@gmail.com","phone":"(252) 640-8111"}],"allSigned":true,"allDeposit":true},
+{"id":35,"address":"115 A Howell St","leaseEnd":"7/31/26","beds":4,"owner":"Nate and Amanda","area":"Purefoy","group":"renewed","substate":"Renewal signed","notes":"","turnoverNotes":"Paint cabinets?","residents":[{"name":"Ayda Suing","email":"aydasuing@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Teagan Kleckly","email":"takleck@unc.edu","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Rachel Maselli","email":"rmaselli642@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Hailey Kowing","email":"haileykowing@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":true},
+{"id":36,"address":"115 B Howell St","leaseEnd":"7/31/26","beds":4,"owner":"Nate and Amanda","area":"Purefoy","group":"partial_turn","substate":"Partial turn - some staying, some leaving","notes":"","turnoverNotes":"Paint cabinets?","residents":[{"name":"Madelyn VanDam","email":"madelynvandam@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Lilah Krueger","email":"juliafowlkes1@gmail.com","status":"leaving","leaseSigned":true,"depositPaid":false},{"name":"Ava MerendaPerozzi","email":"avamp@unc.edu","status":"leaving","leaseSigned":true,"depositPaid":false},{"name":"Hadley Marshall","email":"hadleyemarshall@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":false},
+{"id":37,"address":"115 C Howell St","leaseEnd":"5/31/26","beds":4,"owner":"Nate and Amanda","area":"Purefoy","group":"renewing","substate":"Some confirmed renewing, some unknown","notes":"","turnoverNotes":"Remodeled (2020) full paint out (2020)","residents":[{"name":"Dylan V. Hartslief","email":"hartsliefdylan11@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Zachary S. Henkin","email":"zach.henkin7@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Michael R. Smith","email":"michael63301@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"Luke Andress","email":"lukeandress33@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":38,"address":"116 A Purefoy Rd","leaseEnd":"7/31/26","beds":2,"owner":"Chris","area":"Purefoy","group":"unknown","substate":"Waiting to hear back","notes":"Countertops","turnoverNotes":"","residents":[{"name":"Scott Albert","email":"scottalbert1@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"Mannat Malik","email":"mannat.malik16@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":39,"address":"116 B Purefoy Rd","leaseEnd":"5/31/26","beds":2,"owner":"Chris","area":"Purefoy","group":"full_turnover","substate":"Needs to be listed","notes":"","turnoverNotes":"","residents":[{"name":"Abbie Nash","email":"abigail.nash318@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Hunter Quintal","email":"family.quintal.mail@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":40,"address":"118 Purefoy Rd","leaseEnd":"7/31/26","beds":2,"owner":"Ed Gibson","area":"Purefoy","group":"partial_turn","substate":"Partial turn - some staying, some leaving","notes":"On 11/5 said he was renewing but his roommate wasnt and would let us know at the end of the year","turnoverNotes":"","residents":[{"name":"McKenna B. Hutton","email":"escherh220@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Joseph A. England","email":"joseph.england04@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":41,"address":"122 Purefoy Rd","leaseEnd":"6/30/26","beds":1,"owner":"Steve and Jim","area":"Purefoy","group":"renewing","substate":"Interested, lease not yet sent","notes":"","turnoverNotes":"","residents":[{"name":"Yaw Kumi-Ansu","email":"ykumiansu@yahoo.com","status":"renewing","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":42,"address":"123 Purefoy Rd","leaseEnd":"7/31/26","beds":2,"owner":"Carolyn","area":"Purefoy","group":"renewing","substate":"Some confirmed renewing, some unknown","notes":"Emailed 10/17 on 12/15 said she was planning to renew and thought her roommate was too","turnoverNotes":"","residents":[{"name":"Caida Stanelle","email":"caida.mms@icloud.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Melissa Luna","email":"lunamelissa712@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":43,"address":"124 A W Rosemary","leaseEnd":"5/31/26","beds":4,"owner":"Carolyn","area":"North of Campus","group":"full_turnover","substate":"Needs to be listed","notes":"","turnoverNotes":"","residents":[{"name":"Ashley Cook","email":"ashcook@ad.unc.edu","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Alexa Shaffer","email":"alexashaffer7@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Megan Adams","email":"adamsdmegan@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Eliza Parker","email":"ecparker06@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":44,"address":"124 B W Rosemary","leaseEnd":"5/31/26","beds":3,"owner":"Carolyn","area":"North of Campus","group":"full_turnover","substate":"Needs to be listed","notes":"","turnoverNotes":"","residents":[{"name":"Reese Ward","email":"reesewardd@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Helen Ransom","email":"helenransom2@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Kayce Arkinson","email":"kaycearkinson@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":45,"address":"126 A North St","leaseEnd":"5/31/26","beds":4,"owner":"Carolyn","area":"North of Campus","group":"renewed","substate":"Renewal signed","notes":"","turnoverNotes":"","residents":[{"name":"Sarah Shiflet","email":"sarahlshiflet@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Caroline Maxfield","email":"carolinem6705@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Emma Schemerhorn","email":"ersschemerhorn@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Ryann Tighe","email":"seriouslyryann@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":true},
+{"id":46,"address":"126 B North St","leaseEnd":"5/31/26","beds":4,"owner":"Carolyn","area":"North of Campus","group":"turnover_rented","substate":"New tenant found, lease in progress","notes":"","turnoverNotes":"","residents":[{"name":"Elizabeth Edgington","email":"turtlesrcool86@gmail.com","status":"leaving","leaseSigned":true,"depositPaid":true},{"name":"Carolina ONeal","email":"carolro@unc.edu","status":"leaving","leaseSigned":true,"depositPaid":true},{"name":"Laura Woodrow","email":"lwoodrow@unc.edu","status":"leaving","leaseSigned":true,"depositPaid":true},{"name":"Lillian Meehan","email":"lillianrmeehan@gmail.com","status":"leaving","leaseSigned":true,"depositPaid":true}],"nextResidents":[{"name":"SaraLynn G. Loucks","email":"slgl@unc.edu","phone":"(434) 941-1022"},{"name":"Jennifer K. Peppers","email":"jenpep13@gmail.com","phone":"(919) 695-6403"},{"name":"Anna C. Larsen","email":"annaclarsen05@gmail.com","phone":"(404) 631-7777"},{"name":"Sofia Soto","email":"sdsoto@unc.edu","phone":"(336) 350-3901"}],"allSigned":true,"allDeposit":true},
+{"id":47,"address":"127 Purefoy Rd","leaseEnd":"7/31/26","beds":2,"owner":"Steve","area":"Purefoy","group":"renewed","substate":"Renewal signed","notes":"Lease sent 11/18","turnoverNotes":"","residents":[{"name":"Natalya S. Schoenwether","email":"natalyas.808@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Garon Joannou","email":"joannougaron@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":true},
+{"id":48,"address":"128 A Purefoy Rd","leaseEnd":"5/31/26","beds":1,"owner":"Nate","area":"Purefoy","group":"unknown","substate":"Waiting to hear back","notes":"","turnoverNotes":"","residents":[{"name":"Selin Kucukoruc","email":"jian_guo@med.unc.edu","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":49,"address":"129.5 Purefoy Rd","leaseEnd":"5/31/26","beds":4,"owner":"Nate","area":"Purefoy","group":"turnover_rented","substate":"New tenant found, lease in progress","notes":"","turnoverNotes":"","residents":[{"name":"Catherine B. Sauter","email":"catherinebsauter@gmail.com","status":"leaving","leaseSigned":true,"depositPaid":false},{"name":"Nikhita P. Tsambasis","email":"nikhi2702@gmail.com","status":"leaving","leaseSigned":true,"depositPaid":false},{"name":"Reagan A. Howell","email":"rhowell0615@gmail.com","status":"leaving","leaseSigned":true,"depositPaid":false},{"name":"Madeline C. Sage","email":"sagem@umich.edu","status":"leaving","leaseSigned":true,"depositPaid":false}],"nextResidents":[{"name":"Mylah L. Howe","email":"Mylahlhowe29@gmail.com","phone":"(704) 917-8800"},{"name":"Francesca S. pike","email":"francescapike2007@gmail.com","phone":"(910) 523-1551"},{"name":"Grace E. Miller","email":"19gracemiller@gmail.com","phone":"(509) 270-6240"},{"name":"Grace E. Hanlon","email":"graciehanlon07@gmail.com","phone":"(910) 547-0806"}],"allSigned":true,"allDeposit":false},
+{"id":50,"address":"129.5 A Purefoy Rd","leaseEnd":"7/31/26","beds":1,"owner":"Nate","area":"Purefoy","group":"unknown","substate":"Waiting to hear back","notes":"","turnoverNotes":"","residents":[{"name":"Annabelle H. Rice","email":"annabelle.reyesrice@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":51,"address":"1300 A N Greensboro St","leaseEnd":"7/31/26","beds":1,"owner":"Nate and Amanda","area":"Carrboro","group":"unknown","substate":"Waiting to hear back","notes":"One roommate moved out in December maybe check back in a little later","turnoverNotes":"Did not paint (2020)","residents":[{"name":"Ian A. Heaps","email":"i.heaps1027@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":52,"address":"1300 B N Greensboro St","leaseEnd":"7/31/26","beds":1,"owner":"Nate and Amanda","area":"Carrboro","group":"unknown","substate":"Waiting to hear back","notes":"","turnoverNotes":"","residents":[{"name":"Heather Smith","email":"moellio.heather@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":53,"address":"1300 C N Greensboro St","leaseEnd":"5/31/26","beds":1,"owner":"Nate and Amanda","area":"Carrboro","group":"unknown","substate":"Waiting to hear back","notes":"Still planning as of 11/7","turnoverNotes":"","residents":[{"name":"Kristan E. Shawgo","email":"sightsonmonday@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":54,"address":"131 A Purefoy Rd","leaseEnd":"5/31/26","beds":2,"owner":"Carolyn","area":"Purefoy","group":"full_turnover","substate":"Needs to be listed","notes":"","turnoverNotes":"","residents":[{"name":"Ellie June","email":"Elrjune@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Jorge Fermin","email":"Fermin.jorge@outlook.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":55,"address":"131 C Purefoy Rd","leaseEnd":"6/30/26","beds":1,"owner":"Carolyn","area":"Purefoy","group":"unknown","substate":"Waiting to hear back","notes":"Emailed 11/13","turnoverNotes":"","residents":[{"name":"Mary E. Zimmermann","email":"mollyzimm6@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":56,"address":"136 A Purefoy Rd","leaseEnd":"6/30/26","beds":3,"owner":"Carolyn","area":"Purefoy","group":"unknown","substate":"Waiting to hear back","notes":"Said he wouldnt know about residency until March","turnoverNotes":"","residents":[{"name":"Cheyenne Esser","email":"c.esser713@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"Anna Crist","email":"anna.e.crist2@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"Marvin Albert Meza Jarquin","email":"albertmeza1993@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":57,"address":"136 B Purefoy Rd","leaseEnd":"7/31/26","beds":3,"owner":"Carolyn","area":"Purefoy","group":"turnover_rented","substate":"New tenant signed, deposit pending","notes":"","turnoverNotes":"","residents":[{"name":"Lauryn Taylor","email":"laurynxjada@gmail.com","status":"leaving","leaseSigned":true,"depositPaid":true},{"name":"Tristan Moore","email":"toody.tm@gmail.com","status":"leaving","leaseSigned":true,"depositPaid":true},{"name":"Layne Serdah","email":"layneserdah1@gmail.com","status":"leaving","leaseSigned":true,"depositPaid":true}],"nextResidents":[{"name":"Triston S. Rhodes","email":"tristonrhodes30@gmail.com","phone":"(706) 718-0156"},{"name":"Karl K. Osei-Boateng","email":"karloseiboateng@gmail.com","phone":"(704) 915-7366"},{"name":"Payton A. Bethea","email":"xander.bethea@gmail.com","phone":"(336) 263-1351"}],"allSigned":true,"allDeposit":true},
+{"id":58,"address":"136 C Purefoy Rd","leaseEnd":"6/30/26","beds":3,"owner":"Carolyn","area":"Purefoy","group":"partial_turn","substate":"Some leaving, some undecided","notes":"On 10/17 Collin said he was planning to move out but unsure of Jun and Jonass plans","turnoverNotes":"","residents":[{"name":"Collin Simpson","email":"Simpson12of12@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Hyoungjun Sun","email":"hyoungjunsim019@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Jonas Snyder","email":"jonas.innc@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":59,"address":"136 Purefoy Rd (cottage)","leaseEnd":"7/31/26","beds":2,"owner":"Carolyn","area":"Purefoy","group":"renewed","substate":"Renewal signed","notes":"","turnoverNotes":"","residents":[{"name":"Meghan Pavelka","email":"meghanpavelka@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Jacob Gordon","email":"jacob.gordon409@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":true},
+{"id":60,"address":"137 A Purefoy Rd","leaseEnd":"5/31/26","beds":2,"owner":"Carolyn","area":"Purefoy","group":"renewed","substate":"Renewal signed","notes":"","turnoverNotes":"","residents":[{"name":"Mia G. Cushman","email":"mi.cushman5@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Shayne R. Pratt","email":"shaynepratt19@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[{"name":"Mia G. Cushman","email":"mi.cushman5@gmail.com","phone":""},{"name":"Shayne R. Pratt","email":"shaynepratt19@gmail.com","phone":""}],"allSigned":true,"allDeposit":true},
+{"id":61,"address":"137 B Purefoy Rd","leaseEnd":"7/31/26","beds":2,"owner":"Carolyn","area":"Purefoy","group":"renewed","substate":"Renewal signed","notes":"","turnoverNotes":"","residents":[{"name":"Margaret L. Dicks","email":"maggied1557@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Ainsley E. Mesnard","email":"aemesnard12@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[{"name":"Margaret L. Dicks","email":"maggied1557@gmail.com","phone":""},{"name":"Ainsley E. Mesnard","email":"aemesnard12@gmail.com","phone":""}],"allSigned":true,"allDeposit":true},
+{"id":62,"address":"137 C Purefoy Rd","leaseEnd":"6/30/26","beds":2,"owner":"Carolyn","area":"Purefoy","group":"unknown","substate":"Waiting to hear back","notes":"","turnoverNotes":"","residents":[{"name":"Andrew Stewart","email":"abricestewart@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false},{"name":"Taylor Thompson","email":"Taylorhope2314@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":63,"address":"200 A Broad St","leaseEnd":"7/31/26","beds":2,"owner":"Steve","area":"Carrboro","group":"renewing","substate":"Some confirmed renewing, some unknown","notes":"On 11/7 said he would probably be continuing lease","turnoverNotes":"","residents":[{"name":"Andrew Tran","email":"andrewtran3737@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Andrew Conrad","email":"aconrad1144@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":64,"address":"200 B Broad St","leaseEnd":"7/31/26","beds":2,"owner":"Steve","area":"Carrboro","group":"renewed","substate":"Renewal signed","notes":"","turnoverNotes":"","residents":[{"name":"Tate Jones","email":"tatewjones@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Sarah Davis","email":"sarahedavis17@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":true},
+{"id":65,"address":"207 B Oak Ave","leaseEnd":"7/31/26","beds":2,"owner":"Nate and Amanda","area":"Carrboro","group":"renewing","substate":"Interested, lease not yet sent","notes":"","turnoverNotes":"","residents":[{"name":"Elizabeth A. Passannante","email":"eagudas4@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Luke J. Passannante","email":"lukejpassannante@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":66,"address":"207 Oak Ave","leaseEnd":"7/31/26","beds":4,"owner":"Nate and Amanda","area":"Carrboro","group":"full_turnover","substate":"Needs to be listed","notes":"","turnoverNotes":"","residents":[{"name":"Sydney Mahon","email":"sbmahon7@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Sophia Lietzan","email":"lietz@unc.edu","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Xavier Stephens","email":"xavierr.stephenss@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Heidi G. Dittus","email":"heididittus14@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":67,"address":"308 W Poplar St","leaseEnd":"7/31/26","beds":4,"owner":"Steve and Jim","area":"Carrboro","group":"partial_turn","substate":"Partial turn - some staying, some leaving","notes":"","turnoverNotes":"","residents":[{"name":"Lila Peters","email":"peterslm1@appstate.edu","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Susan Rahimzadeh","email":"srr72@georgetown.edu","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Zoe Blain","email":"zluciab@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false},{"name":"Sada Maryonov","email":"smmaryanov@gmail.com","status":"renewing","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":68,"address":"507 Monroe St","leaseEnd":"7/31/26","beds":4,"owner":"Unknown","area":"Purefoy","group":"full_turnover","substate":"Needs to be listed","notes":"","turnoverNotes":"","residents":[{"name":"Mabeki Mvuendy","email":"Mabeki@unc.edu","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Ryan Gies","email":"ryandgies@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Nathan Foster","email":"nfoste@unc.edu","status":"leaving","leaseSigned":false,"depositPaid":false},{"name":"Samuel McDonald","email":"samcdon@unc.edu","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":69,"address":"891 MLK Jr Blvd #10","leaseEnd":"5/31/26","beds":1,"owner":"Nate","area":"North of Campus","group":"renewed","substate":"Renewal signed","notes":"","turnoverNotes":"","residents":[{"name":"Ben Camras","email":"bgcamras@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":true},
+{"id":70,"address":"891 MLK Jr Blvd #11","leaseEnd":"12/31/26","beds":1,"owner":"Nate","area":"North of Campus","group":"full_turnover","substate":"Needs to be listed","notes":"","turnoverNotes":"","residents":[{"name":"Jacob H. Zurbuch","email":"jacobzurbuch@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":71,"address":"891 MLK Jr Blvd #12","leaseEnd":"7/31/26","beds":1,"owner":"Nate","area":"North of Campus","group":"unknown","substate":"Waiting to hear back","notes":"","turnoverNotes":"","residents":[{"name":"Ryan Swimley","email":"swimleyr@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":72,"address":"891 MLK Jr Blvd #2","leaseEnd":"7/31/26","beds":1,"owner":"Nate","area":"North of Campus","group":"full_turnover","substate":"Needs to be listed","notes":"","turnoverNotes":"","residents":[{"name":"Erica J. Zurbuch","email":"ericazurbuch@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":73,"address":"891 MLK Jr Blvd #4","leaseEnd":"5/31/26","beds":1,"owner":"Nate","area":"North of Campus","group":"full_turnover","substate":"Needs to be listed","notes":"Asked for more time we offered that he can extend to the end of July","turnoverNotes":"","residents":[{"name":"Matteo Sammartano","email":"matteo.sammartano@gmail.com","status":"leaving","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false},
+{"id":74,"address":"891 MLK Jr Blvd #5","leaseEnd":"12/31/25","beds":1,"owner":"Nate","area":"North of Campus","group":"renewed","substate":"Renewal signed","notes":"","turnoverNotes":"Repainted (2020)","residents":[{"name":"Catherine S. Horrigan","email":"csheq2@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[{"name":"Catherine S. Horrigan","email":"csheq2@gmail.com","phone":""}],"allSigned":true,"allDeposit":true},
+{"id":75,"address":"891 MLK Jr Blvd #6","leaseEnd":"5/31/26","beds":2,"owner":"Nate","area":"North of Campus","group":"renewed","substate":"Renewal signed","notes":"","turnoverNotes":"","residents":[{"name":"Christopher D. Martinez","email":"christopherdmp@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true},{"name":"Victoria M. Albright","email":"valbright012@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":true},
+{"id":76,"address":"891 MLK Jr Blvd #7","leaseEnd":"4/30/26","beds":1,"owner":"Nate","area":"North of Campus","group":"renewed","substate":"Renewal signed","notes":"","turnoverNotes":"","residents":[{"name":"Sarah L. Nahum","email":"sarahlnahum@gmail.com","status":"renewing","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":true},
+{"id":77,"address":"891 MLK Jr Blvd #8","leaseEnd":"5/31/26","beds":1,"owner":"Nate","area":"North of Campus","group":"full_turnover","substate":"Listed, lease in progress","notes":"Moving in may 1","turnoverNotes":"","residents":[{"name":"Maddox Wagner","email":"maddoxwagner@gmail.com","status":"leaving","leaseSigned":true,"depositPaid":true}],"nextResidents":[],"allSigned":true,"allDeposit":true},
+{"id":78,"address":"891 MLK Jr Blvd #9","leaseEnd":"7/31/26","beds":1,"owner":"Nate","area":"North of Campus","group":"unknown","substate":"Waiting to hear back","notes":"Said she needs more time to know if her program will be funded","turnoverNotes":"","residents":[{"name":"Ariadne C. Tsoulouhas","email":"ariaci@gmail.com","status":"unknown","leaseSigned":false,"depositPaid":false}],"nextResidents":[],"allSigned":false,"allDeposit":false}
+];
+
+// ─── CONFIG ─────────────────────────────────────────────────────────────────
+const GC = {
+  renewed:            { label: "Renewed",              color: "#22c55e", bg: "#052e16", text: "#bbf7d0", icon: "✓" },
+  renewing:           { label: "Renewing",             color: "#4ade80", bg: "#14532d", text: "#bbf7d0", icon: "↻" },
+  partial_turn:       { label: "Partial Turn",         color: "#3b82f6", bg: "#172554", text: "#bfdbfe", icon: "◐" },
+  partial_turn_leased:{ label: "Partial (Lease Done)", color: "#93c5fd", bg: "#1e3a5f", text: "#dbeafe", icon: "◑" },
+  unknown:            { label: "Unknown",              color: "#a1a1aa", bg: "#27272a", text: "#d4d4d8", icon: "?" },
+  full_turnover:      { label: "Full Turnover",        color: "#f97316", bg: "#431407", text: "#fed7aa", icon: "⟳" },
+  turnover_rented:    { label: "Turnover (Rented)",    color: "#a78bfa", bg: "#2e1065", text: "#ddd6fe", icon: "★" },
+};
+
+const SORT_OPTS = [
+  { key: "date", label: "By Date" },
+  { key: "area", label: "By Area" },
+  { key: "owner", label: "By Owner" },
+  { key: "status", label: "By Status" },
+  { key: "priority", label: "By Priority" },
+];
+
+const PRIO = ["full_turnover","partial_turn","unknown","partial_turn_leased","renewing","turnover_rented","renewed"];
+
+function parseDate(d) {
+  if (!d) return new Date(2099,0,1);
+  const p = d.split("/").map(Number);
+  return new Date(2000+(p[2]<100?p[2]:p[2]-2000), p[0]-1, p[1]);
+}
+function fmtMonth(d) {
+  return parseDate(d).toLocaleDateString("en-US",{month:"short",year:"2-digit"});
+}
+function daysUntil(d) {
+  return Math.ceil((parseDate(d)-new Date())/(864e5));
+}
+
+// ─── COMPONENTS ─────────────────────────────────────────────────────────────
+
+function StatusBadge({group}) {
+  const c = GC[group];
+  return e("span", {style:{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 8px",borderRadius:4,fontSize:11,fontWeight:600,background:c.color+"22",color:c.color,letterSpacing:0.3}},
+    e("span",{style:{fontSize:13}},c.icon), " ", c.label
+  );
+}
+
+function Tile({unit, onClick}) {
+  const c = GC[unit.group];
+  const days = daysUntil(unit.leaseEnd);
+  const urgent = days <= 30 && !["renewed","turnover_rented"].includes(unit.group);
+  
+  return e("div", {
+    onClick: onClick,
+    style: {
+      background:c.bg, border:"1.5px solid "+(urgent?"#ef4444":c.color+"44"),
+      borderRadius:8, padding:"10px 12px", cursor:"pointer", transition:"all 0.15s ease",
+      position:"relative", overflow:"hidden", minHeight:72,
+      boxShadow: urgent?"0 0 12px #ef444433":"none",
+    },
+    onMouseEnter: function(ev){ev.currentTarget.style.transform="translateY(-1px)";ev.currentTarget.style.boxShadow="0 4px 16px #00000044"},
+    onMouseLeave: function(ev){ev.currentTarget.style.transform="none";ev.currentTarget.style.boxShadow=urgent?"0 0 12px #ef444433":"none"},
+  },
+    urgent && e("div",{style:{position:"absolute",top:0,right:0,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:"0 0 0 6px",letterSpacing:0.5}},
+      days<=0?"OVERDUE":days+"d"
+    ),
+    e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}},
+      e("div",{style:{minWidth:0,flex:1}},
+        e("div",{style:{fontSize:13,fontWeight:700,color:"#f4f4f5",lineHeight:1.2,marginBottom:3}},unit.address),
+        e("div",{style:{fontSize:11,color:"#a1a1aa",display:"flex",gap:8,flexWrap:"wrap"}},
+          e("span",null,unit.beds+" BR"),
+          e("span",{style:{color:"#71717a"}},"·"),
+          e("span",null,unit.leaseEnd),
+          unit.area && e("span",{style:{color:"#71717a"}},"·"),
+          unit.area && e("span",null,unit.area),
+        )
+      ),
+      e("div",{style:{flexShrink:0}},
+        e("span",{style:{display:"inline-block",width:24,height:24,borderRadius:6,background:c.color,textAlign:"center",lineHeight:"24px",fontSize:14,color:"#000",fontWeight:700}},c.icon)
+      )
+    ),
+    unit.notes && e("div",{style:{marginTop:6,fontSize:10,color:"#a1a1aa",fontStyle:"italic",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}},
+      "💬 "+unit.notes
+    ),
+    unit._userNotes && unit._userNotes.length > 0 && e("div",{style:{marginTop:4,fontSize:10,color:"#fbbf24"}},
+      "📝 "+unit._userNotes.length+" note"+(unit._userNotes.length>1?"s":"")
+    )
+  );
+}
+
+function DetailPanel({unit, onClose, onAddNote}) {
+  const [noteText, setNoteText] = useState("");
+  const [localNotes, setLocalNotes] = useState(unit._userNotes||[]);
+  const c = GC[unit.group];
+
+  useEffect(function(){
+    setLocalNotes(unit._userNotes||[]);
+    setNoteText("");
+  },[unit.id]);
+
+  function handleAdd(){
+    if(!noteText.trim())return;
+    var n = {text:noteText.trim(),time:new Date().toLocaleString(),by:"Andrea"};
+    var updated = [n].concat(localNotes);
+    setLocalNotes(updated);
+    onAddNote(unit.id,updated);
+    setNoteText("");
+  }
+
+  var factPairs = [
+    ["Bedrooms",unit.beds+" BR"],["Lease End",unit.leaseEnd],
+    ["Owner",unit.owner],["Area",unit.area],
+    ["Lease Signed",unit.allSigned?"✅ Yes":"❌ No"],["Deposit Paid",unit.allDeposit?"✅ Yes":"❌ No"],
+  ];
+
+  return e("div",{style:{position:"fixed",top:0,right:0,bottom:0,width:"min(440px, 92vw)",background:"#18181b",borderLeft:"2px solid "+c.color+"44",zIndex:100,overflowY:"auto",boxShadow:"-8px 0 40px #00000088"}},
+    e("div",{style:{padding:20}},
+      // Header
+      e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}},
+        e("div",null,
+          e("h2",{style:{margin:0,fontSize:20,fontWeight:800,color:"#f4f4f5",letterSpacing:-0.5}},unit.address),
+          e("div",{style:{marginTop:6}},e(StatusBadge,{group:unit.group}))
+        ),
+        e("button",{onClick:onClose,style:{background:"#27272a",border:"none",color:"#a1a1aa",cursor:"pointer",width:32,height:32,borderRadius:6,fontSize:18,lineHeight:"32px"}},"×")
+      ),
+      // Substate
+      e("div",{style:{background:c.color+"11",border:"1px solid "+c.color+"33",borderRadius:6,padding:"8px 12px",marginBottom:16,fontSize:13,color:c.text}},unit.substate),
+      // Facts grid
+      e("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}},
+        factPairs.map(function(p){
+          return e("div",{key:p[0],style:{background:"#27272a",borderRadius:6,padding:"6px 10px"}},
+            e("div",{style:{fontSize:10,color:"#71717a",textTransform:"uppercase",letterSpacing:0.5}},p[0]),
+            e("div",{style:{fontSize:13,color:"#e4e4e7",fontWeight:600}},p[1])
+          );
+        })
+      ),
+      // Residents
+      e("div",{style:{marginBottom:16}},
+        e("h3",{style:{margin:"0 0 8px",fontSize:12,color:"#71717a",textTransform:"uppercase",letterSpacing:1}},"Current Residents ("+unit.residents.length+")"),
+        unit.residents.map(function(r,i){
+          return e("div",{key:i,style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid #27272a"}},
+            e("div",null,
+              e("div",{style:{fontSize:13,color:"#e4e4e7",fontWeight:500}},r.name),
+              e("div",{style:{fontSize:11,color:"#71717a"}},r.email)
+            ),
+            e("span",{style:{fontSize:10,padding:"2px 6px",borderRadius:3,fontWeight:600,
+              background:r.status==="renewing"?"#22c55e22":r.status==="leaving"?"#f9731622":"#a1a1aa22",
+              color:r.status==="renewing"?"#4ade80":r.status==="leaving"?"#fb923c":"#a1a1aa",
+            }},r.status)
+          );
+        })
+      ),
+      // Next year residents
+      unit.nextResidents.length>0 && e("div",{style:{marginBottom:16}},
+        e("h3",{style:{margin:"0 0 8px",fontSize:12,color:"#71717a",textTransform:"uppercase",letterSpacing:1}},"Next Year Residents ("+unit.nextResidents.length+")"),
+        unit.nextResidents.map(function(r,i){
+          return e("div",{key:i,style:{padding:"6px 0",borderBottom:"1px solid #27272a"}},
+            e("div",{style:{fontSize:13,color:"#a78bfa",fontWeight:500}},r.name),
+            e("div",{style:{fontSize:11,color:"#71717a"}},r.email+(r.phone?" · "+r.phone:""))
+          );
+        })
+      ),
+      // Spreadsheet notes
+      (unit.notes||unit.turnoverNotes) && e("div",{style:{marginBottom:16,background:"#27272a",borderRadius:6,padding:10}},
+        e("h3",{style:{margin:"0 0 6px",fontSize:12,color:"#71717a",textTransform:"uppercase",letterSpacing:1}},"Spreadsheet Notes"),
+        unit.notes && e("div",{style:{fontSize:12,color:"#d4d4d8",marginBottom:4}},unit.notes),
+        unit.turnoverNotes && e("div",{style:{fontSize:12,color:"#fbbf24",marginTop:4}},"🔧 Turnover: "+unit.turnoverNotes)
+      ),
+      // Quick notes
+      e("div",{style:{marginBottom:16}},
+        e("h3",{style:{margin:"0 0 8px",fontSize:12,color:"#71717a",textTransform:"uppercase",letterSpacing:1}},"Quick Notes"),
+        e("div",{style:{display:"flex",gap:6,marginBottom:8}},
+          e("input",{type:"text",value:noteText,
+            onChange:function(ev){setNoteText(ev.target.value)},
+            onKeyDown:function(ev){if(ev.key==="Enter")handleAdd()},
+            placeholder:"Type a note and press Enter...",
+            style:{flex:1,background:"#27272a",border:"1px solid #3f3f46",borderRadius:6,padding:"8px 10px",color:"#e4e4e7",fontSize:13,outline:"none"}
+          }),
+          e("button",{onClick:handleAdd,style:{background:c.color,border:"none",borderRadius:6,padding:"0 14px",color:"#000",fontWeight:700,fontSize:13,cursor:"pointer"}},"+")
+        ),
+        localNotes.map(function(n,i){
+          return e("div",{key:i,style:{padding:"6px 8px",background:"#27272a",borderRadius:4,marginBottom:4,borderLeft:"3px solid "+c.color}},
+            e("div",{style:{fontSize:12,color:"#e4e4e7"}},n.text),
+            e("div",{style:{fontSize:10,color:"#71717a",marginTop:2}},n.by+" · "+n.time)
+          );
+        }),
+        localNotes.length===0 && e("div",{style:{fontSize:12,color:"#52525b",fontStyle:"italic"}},"No notes yet. Tap here and type.")
+      )
+    )
+  );
+}
+
+function SummaryBar({units}) {
+  var counts = {};
+  units.forEach(function(u){counts[u.group]=(counts[u.group]||0)+1;});
+  return e("div",{style:{display:"flex",gap:6,flexWrap:"wrap",padding:"8px 0"}},
+    Object.keys(GC).map(function(key){
+      var cfg=GC[key];
+      return e("div",{key:key,style:{display:"flex",alignItems:"center",gap:5,background:cfg.color+"15",border:"1px solid "+cfg.color+"33",borderRadius:6,padding:"4px 10px"}},
+        e("span",{style:{color:cfg.color,fontSize:14}},cfg.icon),
+        e("span",{style:{color:cfg.color,fontSize:12,fontWeight:700}},counts[key]||0),
+        e("span",{style:{color:"#a1a1aa",fontSize:11}},cfg.label)
+      );
+    }),
+    e("div",{style:{display:"flex",alignItems:"center",gap:5,background:"#ffffff08",borderRadius:6,padding:"4px 10px"}},
+      e("span",{style:{color:"#f4f4f5",fontSize:12,fontWeight:700}},units.length),
+      e("span",{style:{color:"#a1a1aa",fontSize:11}},"total units")
+    )
+  );
+}
+
+// ─── MAIN APP ───────────────────────────────────────────────────────────────
+
+function Dashboard() {
+  const [sortBy, setSortBy] = useState("date");
+  const [filterGroup, setFilterGroup] = useState(null);
+  const [filterArea, setFilterArea] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [searchText, setSearchText] = useState("");
+  const [userNotes, setUserNotes] = useState(function(){
+    try { return JSON.parse(localStorage.getItem("mills_notes")||"{}"); } catch(e){ return {}; }
+  });
+
+  // Persist notes to localStorage
+  useEffect(function(){
+    try { localStorage.setItem("mills_notes", JSON.stringify(userNotes)); } catch(e){}
+  },[userNotes]);
+
+  var enriched = useMemo(function(){
+    return UNITS.map(function(u){return Object.assign({},u,{_userNotes:userNotes[u.id]||[]});});
+  },[userNotes]);
+
+  var filtered = useMemo(function(){
+    var list = enriched;
+    if(filterGroup) list = list.filter(function(u){return u.group===filterGroup;});
+    if(filterArea) list = list.filter(function(u){return u.area===filterArea;});
+    if(searchText){
+      var q = searchText.toLowerCase();
+      list = list.filter(function(u){
+        return u.address.toLowerCase().includes(q) ||
+          u.residents.some(function(r){return r.name.toLowerCase().includes(q);}) ||
+          u.owner.toLowerCase().includes(q);
+      });
+    }
+    return list;
+  },[enriched,filterGroup,filterArea,searchText]);
+
+  var grouped = useMemo(function(){
+    var sorted = filtered.slice().sort(function(a,b){
+      if(sortBy==="date") return parseDate(a.leaseEnd)-parseDate(b.leaseEnd);
+      if(sortBy==="priority") return PRIO.indexOf(a.group)-PRIO.indexOf(b.group);
+      if(sortBy==="area") return (a.area||"ZZZ").localeCompare(b.area||"ZZZ");
+      if(sortBy==="owner") return (a.owner||"ZZZ").localeCompare(b.owner||"ZZZ");
+      if(sortBy==="status") return (a.group||"").localeCompare(b.group||"");
+      return 0;
+    });
+    var groups = {};
+    sorted.forEach(function(u){
+      var key;
+      if(sortBy==="date") key=fmtMonth(u.leaseEnd);
+      else if(sortBy==="area") key=u.area||"Unknown";
+      else if(sortBy==="owner") key=u.owner||"Unknown";
+      else if(sortBy==="status") key=GC[u.group]?GC[u.group].label:u.group;
+      else if(sortBy==="priority") key=GC[u.group]?GC[u.group].label:u.group;
+      else key="All";
+      if(!groups[key]) groups[key]=[];
+      groups[key].push(u);
+    });
+    return groups;
+  },[filtered,sortBy]);
+
+  var selectedUnit = enriched.find(function(u){return u.id===selectedId;});
+  var areas = Array.from(new Set(UNITS.map(function(u){return u.area;}).filter(Boolean))).sort();
+
+  var handleAddNote = useCallback(function(unitId, notes){
+    setUserNotes(function(prev){
+      var next = Object.assign({},prev);
+      next[unitId] = notes;
+      return next;
+    });
+  },[]);
+
+  return e("div",{style:{minHeight:"100vh",background:"#09090b",color:"#f4f4f5"}},
+    // Overlay
+    selectedId && e("div",{onClick:function(){setSelectedId(null)},style:{position:"fixed",inset:0,background:"#00000066",zIndex:50}}),
+    // Detail panel
+    selectedUnit && e(DetailPanel,{unit:selectedUnit,onClose:function(){setSelectedId(null)},onAddNote:handleAddNote}),
+    // Header
+    e("div",{style:{padding:"16px 20px 0",borderBottom:"1px solid #27272a",position:"sticky",top:0,background:"#09090b",zIndex:40}},
+      e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}},
+        e("div",{style:{display:"flex",alignItems:"baseline",gap:10}},
+          e("h1",{style:{margin:0,fontSize:22,fontWeight:900,letterSpacing:-1,background:"linear-gradient(135deg, #f4f4f5, #a1a1aa)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}},"MILLS RENTALS"),
+          e("span",{style:{fontSize:12,color:"#52525b",fontWeight:500}},"DASHBOARD v0.1")
+        ),
+        e("input",{type:"text",value:searchText,
+          onChange:function(ev){setSearchText(ev.target.value)},
+          placeholder:"Search address, tenant, owner...",
+          style:{background:"#18181b",border:"1px solid #27272a",borderRadius:6,padding:"6px 12px",color:"#e4e4e7",fontSize:12,width:240,outline:"none",fontFamily:"inherit"}
+        })
+      ),
+      // Toolbar
+      e("div",{style:{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",padding:"10px 0"}},
+        e("span",{style:{fontSize:10,color:"#52525b",textTransform:"uppercase",letterSpacing:1,marginRight:4}},"Sort:"),
+        SORT_OPTS.map(function(o){
+          return e("button",{key:o.key,onClick:function(){setSortBy(o.key)},style:{
+            background:sortBy===o.key?"#f4f4f5":"#27272a",color:sortBy===o.key?"#09090b":"#a1a1aa",
+            border:"none",borderRadius:4,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"
+          }},o.label);
+        }),
+        e("span",{style:{width:1,height:16,background:"#27272a",margin:"0 4px"}}),
+        e("span",{style:{fontSize:10,color:"#52525b",textTransform:"uppercase",letterSpacing:1,marginRight:4}},"Filter:"),
+        e("select",{value:filterGroup||"",onChange:function(ev){setFilterGroup(ev.target.value||null)},style:{background:"#27272a",color:"#a1a1aa",border:"1px solid #3f3f46",borderRadius:4,padding:"3px 8px",fontSize:11,fontFamily:"inherit",cursor:"pointer"}},
+          e("option",{value:""},"All Statuses"),
+          Object.keys(GC).map(function(k){return e("option",{key:k,value:k},GC[k].icon+" "+GC[k].label);})
+        ),
+        e("select",{value:filterArea||"",onChange:function(ev){setFilterArea(ev.target.value||null)},style:{background:"#27272a",color:"#a1a1aa",border:"1px solid #3f3f46",borderRadius:4,padding:"3px 8px",fontSize:11,fontFamily:"inherit",cursor:"pointer"}},
+          e("option",{value:""},"All Areas"),
+          areas.map(function(a){return e("option",{key:a,value:a},a);})
+        ),
+        (filterGroup||filterArea||searchText) && e("button",{onClick:function(){setFilterGroup(null);setFilterArea(null);setSearchText("")},style:{background:"#ef4444",color:"#fff",border:"none",borderRadius:4,padding:"3px 8px",fontSize:10,fontWeight:700,cursor:"pointer"}},"Clear")
+      ),
+      e(SummaryBar,{units:filtered})
+    ),
+    // Grid
+    e("div",{style:{padding:"16px 20px 40px"}},
+      Object.keys(grouped).map(function(groupLabel){
+        var units = grouped[groupLabel];
+        return e("div",{key:groupLabel,style:{marginBottom:24}},
+          e("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:10,paddingBottom:6,borderBottom:"1px solid #1a1a1e"}},
+            e("h2",{style:{margin:0,fontSize:14,fontWeight:800,color:"#e4e4e7",letterSpacing:-0.3}},groupLabel),
+            e("span",{style:{fontSize:11,color:"#52525b",background:"#18181b",padding:"1px 6px",borderRadius:3}},units.length+(units.length===1?" unit":" units"))
+          ),
+          e("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))",gap:8}},
+            units.map(function(u){
+              return e(Tile,{key:u.id,unit:u,onClick:function(){setSelectedId(u.id)}});
+            })
+          )
+        );
+      }),
+      Object.keys(grouped).length===0 && e("div",{style:{textAlign:"center",padding:60,color:"#52525b"}},"No units match your filters.")
+    )
+  );
+}
+
+ReactDOM.render(e(Dashboard), document.getElementById("root"));
+</script>
+</body>
+</html>
