@@ -1,32 +1,111 @@
 /**
  * Netlify Function: GET /api/get-units
  *
- * Fetches both sheets from the Google Spreadsheet using a service account,
- * parses them into dashboard unit objects, and returns JSON.
+ * Data source priority:
+ *   1. Supabase (when SUPABASE_URL + SUPABASE_SERVICE_KEY are set)
+ *   2. Google Sheets (when GOOGLE_SERVICE_ACCOUNT_JSON + SHEET_ID are set)
+ *   3. Empty — React app falls back to seed data
  *
- * Required env vars:
- *   GOOGLE_SERVICE_ACCOUNT_JSON - full JSON key for the service account
- *   SHEET_ID                    - the Google Sheets document ID
- *   SHEET_TAB_RENEWALS          - tab name for renewals (default: "Sheet1")
- *   SHEET_TAB_PROPERTIES        - tab name for property info (default: "Sheet2")
+ * The browser never sees Supabase or Google credentials.
+ * All auth is server-side in this function.
+ *
+ * Required env vars (at least one source):
+ *   SUPABASE_URL, SUPABASE_SERVICE_KEY     — preferred source
+ *   GOOGLE_SERVICE_ACCOUNT_JSON, SHEET_ID  — legacy fallback
  */
-
-// Dynamic import so the function still loads when googleapis isn't installed
-// (local dev without the dependency). In that case it returns an empty result.
 
 export async function handler() {
   const {
+    SUPABASE_URL,
+    SUPABASE_SERVICE_KEY,
     GOOGLE_SERVICE_ACCOUNT_JSON,
     SHEET_ID,
     SHEET_TAB_RENEWALS = 'Sheet1',
     SHEET_TAB_PROPERTIES = 'Sheet2',
   } = process.env;
 
+  // ── 1. Try Supabase ─────────────────────────────────────────────────────────
+  if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+      // unit_full view joins residents + next_residents as JSON arrays
+      const { data, error } = await supabase
+        .from('unit_full')
+        .select('*');
+
+      if (error) throw error;
+
+      // Shape Supabase rows into the same unit object the React app expects
+      const units = (data || []).map((row, idx) => {
+        const residents = (row.residents || []).map(r => ({
+          name:        r.name        || '',
+          email:       r.email       || '',
+          status:      r.status      || 'unknown',
+          leaseSigned: r.leaseSigned || false,
+          depositPaid: r.depositPaid || false,
+        }));
+
+        const nextResidents = (row.next_residents || []).map(r => ({
+          name:  r.name  || '',
+          email: r.email || '',
+          phone: r.phone || '',
+        }));
+
+        const group    = deriveGroup(residents, nextResidents);
+        const substate = deriveSubstate(group, residents, nextResidents);
+        const allSigned = residents.length > 0 &&
+          residents.every(r => r.status === 'leaving' || r.leaseSigned);
+        const allDeposit = residents.length > 0 &&
+          residents.every(r => r.status === 'leaving' || r.depositPaid);
+
+        // Find earliest lease end among current residents
+        const leaseEnds = residents
+          .map(r => r.leaseEnd)
+          .filter(Boolean)
+          .map(d => new Date(d));
+        const leaseEnd = leaseEnds.length
+          ? formatDate(new Date(Math.min(...leaseEnds)))
+          : '';
+
+        return {
+          id:            idx + 1,
+          address:       row.address,
+          leaseEnd,
+          beds:          row.beds  ?? 0,
+          baths:         row.baths ?? null,
+          owner:         row.owner_name || '',
+          area:          row.area       || '',
+          group,
+          substate,
+          notes:         '',
+          turnoverNotes: '',
+          utilities:     row.utilities  || '',
+          residents,
+          nextResidents,
+          allSigned,
+          allDeposit,
+        };
+      });
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ units, source: 'supabase', fetchedAt: new Date().toISOString() }),
+      };
+    } catch (err) {
+      console.error('get-units supabase error:', err);
+      // Fall through to Google Sheets
+    }
+  }
+
+  // ── 2. Try Google Sheets (legacy) ───────────────────────────────────────────
   if (!GOOGLE_SERVICE_ACCOUNT_JSON || !SHEET_ID) {
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ units: [], source: 'none', error: 'Missing credentials or sheet ID' }),
+      body: JSON.stringify({ units: [], source: 'none', error: 'No data source configured' }),
     };
   }
 
@@ -40,32 +119,34 @@ export async function handler() {
     });
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // Fetch both tabs in parallel
     const [renewalsRes, propertiesRes] = await Promise.all([
       sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${SHEET_TAB_RENEWALS}!A:AA` }),
       sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${SHEET_TAB_PROPERTIES}!A:AA` }),
     ]);
 
-    const sheet1Rows = renewalsRes.data.values || [];
-    const sheet2Rows = propertiesRes.data.values || [];
-
-    // Use the shared parser — import relative path from the project source
-    // Since Netlify Functions bundle from the functions dir, we use a simple inline version
-    const units = parseSheets(sheet1Rows, sheet2Rows);
+    const units = parseSheets(
+      renewalsRes.data.values || [],
+      propertiesRes.data.values || [],
+    );
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ units, source: 'live', fetchedAt: new Date().toISOString() }),
+      body: JSON.stringify({ units, source: 'google_sheets', fetchedAt: new Date().toISOString() }),
     };
   } catch (err) {
-    console.error('get-units error:', err);
+    console.error('get-units sheets error:', err);
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ units: [], source: 'error', error: err.message }),
     };
   }
+}
+
+// ─── Date formatter: Date → "M/D/YY" (matches seed data format) ──────────────
+function formatDate(d) {
+  return `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(-2)}`;
 }
 
 // ─── Inline parser (mirrors src/lib/sheetParser.js) ─────────────────────────

@@ -6,3 +6,5 @@ dist/
 
 # Raw spreadsheet exports — contain tenant PII, never commit
 src/data/csv/
+
+.claude/

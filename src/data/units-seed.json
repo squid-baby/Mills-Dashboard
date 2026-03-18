@@ -28,13 +28,19 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 1.5,
+    "utilities": "Water",
+    "propertyType": "apartment",
+    "sqFt": 954,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 2,
     "address": "#24 Cedar Court Apartments",
     "leaseEnd": "7/31/26",
-    "beds": 1,
+    "beds": 2,
     "owner": "Jim",
     "area": "Carrboro",
     "group": "renewed",
@@ -52,13 +58,19 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 1.5,
+    "utilities": "water",
+    "propertyType": "apartment",
+    "sqFt": 954,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 3,
     "address": "#27 Cedar Court Apartments",
     "leaseEnd": "7/31/26",
-    "beds": 1,
+    "beds": 2,
     "owner": "Jim",
     "area": "Carrboro",
     "group": "renewing",
@@ -76,7 +88,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1.5,
+    "utilities": "water",
+    "propertyType": "apartment",
+    "sqFt": 954,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 4,
@@ -107,13 +125,18 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "propertyType": "duplex",
+    "sqFt": 900,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 5,
     "address": "100 B Hanna St",
     "leaseEnd": "7/31/26",
-    "beds": 3,
+    "beds": 2,
     "owner": "Nate and Amanda",
     "area": "Carrboro",
     "group": "renewing",
@@ -145,13 +168,18 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "propertyType": "duplex",
+    "sqFt": 900,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 6,
     "address": "1010 South Columbia",
     "leaseEnd": "4/30/26",
-    "beds": 1,
+    "beds": 2,
     "owner": "Brian",
     "area": "Purefoy",
     "group": "renewing",
@@ -169,7 +197,12 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "propertyType": "house",
+    "sqFt": 1200,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 7,
@@ -200,7 +233,13 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 1,
+    "utilities": "All utilities (except cable + internet) included",
+    "propertyType": "Duplex, over under, condos",
+    "sqFt": 869,
+    "freezeWarning": true,
+    "petsAllowed": "No pets allowed"
   },
   {
     "id": 8,
@@ -238,7 +277,13 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "All utilities (except cable + internet) included",
+    "propertyType": "Duplex, over under, condos",
+    "sqFt": 869,
+    "freezeWarning": true,
+    "petsAllowed": "No pets allowed"
   },
   {
     "id": 9,
@@ -262,13 +307,19 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "water and electricity",
+    "propertyType": "apartment",
+    "sqFt": 550,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 10,
     "address": "104 # 4 W Main St",
     "leaseEnd": "7/31/26",
-    "beds": 2,
+    "beds": 1,
     "owner": "Carolyn",
     "area": "Carrboro",
     "group": "unknown",
@@ -293,7 +344,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "water and electricity",
+    "propertyType": "apartment",
+    "sqFt": 550,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 11,
@@ -331,7 +388,13 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "none",
+    "propertyType": "Duplex, condos",
+    "sqFt": 1067,
+    "freezeWarning": false,
+    "petsAllowed": "No pets allowed"
   },
   {
     "id": 12,
@@ -369,7 +432,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "none",
+    "propertyType": "Duplex, condos",
+    "sqFt": 1067,
+    "freezeWarning": false,
+    "petsAllowed": "No pets allowed"
   },
   {
     "id": 13,
@@ -400,7 +469,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "none",
+    "propertyType": "",
+    "sqFt": 916,
+    "freezeWarning": false,
+    "petsAllowed": "No pets allowed"
   },
   {
     "id": 14,
@@ -445,7 +520,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 2,
+    "utilities": "none",
+    "propertyType": "duplex",
+    "sqFt": 1615,
+    "freezeWarning": false,
+    "petsAllowed": "No pets allowed"
   },
   {
     "id": 15,
@@ -490,7 +571,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 2,
+    "utilities": "none",
+    "propertyType": "duplex",
+    "sqFt": 1597,
+    "freezeWarning": false,
+    "petsAllowed": "No pets allowed"
   },
   {
     "id": 16,
@@ -535,13 +622,19 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 2,
+    "utilities": "Water Connected to bnb",
+    "propertyType": "House",
+    "sqFt": 1595,
+    "freezeWarning": true,
+    "petsAllowed": "Yes"
   },
   {
     "id": 17,
     "address": "1101 A N Greensboro",
     "leaseEnd": "3/31/26",
-    "beds": 1,
+    "beds": 2,
     "owner": "Nate and Amanda",
     "area": "Carrboro",
     "group": "renewing",
@@ -559,13 +652,17 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": false
+    "allDeposit": false,
+    "propertyType": "",
+    "sqFt": null,
+    "freezeWarning": false,
+    "petsAllowed": ""
   },
   {
     "id": 18,
     "address": "1101 B N Greensboro",
     "leaseEnd": "1/31/26",
-    "beds": 1,
+    "beds": 2,
     "owner": "Nate and Amanda",
     "area": "Carrboro",
     "group": "renewing",
@@ -583,13 +680,17 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "propertyType": "",
+    "sqFt": null,
+    "freezeWarning": false,
+    "petsAllowed": ""
   },
   {
     "id": 19,
     "address": "1101 C N Greensboro",
     "leaseEnd": "10/31/26",
-    "beds": 1,
+    "beds": 2,
     "owner": "Nate and Amanda",
     "area": "Carrboro",
     "group": "renewed",
@@ -607,13 +708,17 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "propertyType": "",
+    "sqFt": null,
+    "freezeWarning": false,
+    "petsAllowed": ""
   },
   {
     "id": 20,
     "address": "1101 D N Greensboro",
     "leaseEnd": "7/31/26",
-    "beds": 1,
+    "beds": 2,
     "owner": "Nate and Amanda",
     "area": "Carrboro",
     "group": "full_turnover",
@@ -631,7 +736,11 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "propertyType": "",
+    "sqFt": null,
+    "freezeWarning": false,
+    "petsAllowed": ""
   },
   {
     "id": 21,
@@ -662,13 +771,18 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "propertyType": "apartment",
+    "sqFt": 850,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 22,
     "address": "111 A/B North St",
     "leaseEnd": "5/31/26",
-    "beds": 5,
+    "beds": 4,
     "owner": "Carolyn",
     "area": "North of Campus",
     "group": "full_turnover",
@@ -714,7 +828,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 2,
+    "utilities": "Water/sewer",
+    "propertyType": "Duplex, condos",
+    "sqFt": 1634,
+    "freezeWarning": false,
+    "petsAllowed": "No pets allowed"
   },
   {
     "id": 23,
@@ -745,7 +865,12 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "propertyType": "apartment",
+    "sqFt": 850,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 24,
@@ -776,7 +901,12 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 1,
+    "propertyType": "apartment",
+    "sqFt": 850,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 25,
@@ -814,7 +944,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "Water/sewer",
+    "propertyType": "Duplex, condos",
+    "sqFt": 1215,
+    "freezeWarning": false,
+    "petsAllowed": "No pets allowed"
   },
   {
     "id": 26,
@@ -845,7 +981,12 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "propertyType": "apartment",
+    "sqFt": 850,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 27,
@@ -876,7 +1017,12 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "propertyType": "apartment",
+    "sqFt": 850,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 28,
@@ -914,13 +1060,18 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "propertyType": "apartment",
+    "sqFt": 1150,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 29,
     "address": "111 G Howell St",
     "leaseEnd": "5/31/26",
-    "beds": 2,
+    "beds": 3,
     "owner": "Nate and Amanda",
     "area": "Purefoy",
     "group": "partial_turn",
@@ -945,13 +1096,18 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "propertyType": "apartment",
+    "sqFt": 1150,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 30,
     "address": "112 Fidelity St",
     "leaseEnd": "7/31/26",
-    "beds": 3,
+    "beds": 4,
     "owner": "Nate and Amanda",
     "area": "Carrboro",
     "group": "unknown",
@@ -983,7 +1139,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 2,
+    "utilities": "Water connected to back house",
+    "propertyType": "house",
+    "sqFt": 2213,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 31,
@@ -1028,7 +1190,12 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 2,
+    "propertyType": "apartment",
+    "sqFt": 1800,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 32,
@@ -1073,13 +1240,18 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 2,
+    "propertyType": "apartment",
+    "sqFt": 1800,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 33,
     "address": "113 C Howell St",
     "leaseEnd": "7/31/26",
-    "beds": 2,
+    "beds": 4,
     "owner": "Nate and Amanda",
     "area": "Purefoy",
     "group": "full_turnover",
@@ -1104,7 +1276,12 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 2,
+    "propertyType": "apartment",
+    "sqFt": 1800,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 34,
@@ -1146,7 +1323,12 @@
       }
     ],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "utilities": "none",
+    "propertyType": "",
+    "sqFt": 856,
+    "freezeWarning": false,
+    "petsAllowed": "No pets allowed"
   },
   {
     "id": 35,
@@ -1191,7 +1373,12 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 2,
+    "propertyType": "apartment",
+    "sqFt": 1800,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 36,
@@ -1236,7 +1423,12 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 2,
+    "propertyType": "apartment",
+    "sqFt": 1800,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 37,
@@ -1281,13 +1473,18 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 2,
+    "propertyType": "apartment",
+    "sqFt": 1800,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 38,
     "address": "116 A Purefoy Rd",
     "leaseEnd": "7/31/26",
-    "beds": 2,
+    "beds": 1,
     "owner": "Chris",
     "area": "Purefoy",
     "group": "unknown",
@@ -1312,7 +1509,12 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "propertyType": "triplex",
+    "sqFt": 800,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 39,
@@ -1343,7 +1545,12 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "propertyType": "triplex",
+    "sqFt": 800,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 40,
@@ -1374,13 +1581,18 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "propertyType": "house",
+    "sqFt": 800,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 41,
     "address": "122 Purefoy Rd",
     "leaseEnd": "6/30/26",
-    "beds": 1,
+    "beds": 2,
     "owner": "Steve and Jim",
     "area": "Purefoy",
     "group": "renewing",
@@ -1398,13 +1610,18 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "propertyType": "house",
+    "sqFt": 800,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 42,
     "address": "123 Purefoy Rd",
     "leaseEnd": "7/31/26",
-    "beds": 2,
+    "beds": 1,
     "owner": "Carolyn",
     "area": "Purefoy",
     "group": "renewing",
@@ -1429,7 +1646,12 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "propertyType": "house",
+    "sqFt": 700,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 43,
@@ -1474,7 +1696,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 2,
+    "utilities": "water",
+    "propertyType": "duplex",
+    "sqFt": 1560,
+    "freezeWarning": false,
+    "petsAllowed": "No pets allowed"
   },
   {
     "id": 44,
@@ -1512,7 +1740,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "water",
+    "propertyType": "duplex",
+    "sqFt": 975,
+    "freezeWarning": false,
+    "petsAllowed": "No pets allowed"
   },
   {
     "id": 45,
@@ -1557,7 +1791,13 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 2,
+    "utilities": "none",
+    "propertyType": "Duplex, over under",
+    "sqFt": 1500,
+    "freezeWarning": false,
+    "petsAllowed": "No pets allowed"
   },
   {
     "id": 46,
@@ -1623,13 +1863,19 @@
       }
     ],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 2,
+    "utilities": "none",
+    "propertyType": "Duplex, over under",
+    "sqFt": 1500,
+    "freezeWarning": false,
+    "petsAllowed": "No pets allowed"
   },
   {
     "id": 47,
     "address": "127 Purefoy Rd",
     "leaseEnd": "7/31/26",
-    "beds": 2,
+    "beds": 1,
     "owner": "Steve",
     "area": "Purefoy",
     "group": "renewed",
@@ -1654,7 +1900,12 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 1,
+    "propertyType": "house",
+    "sqFt": 700,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 48,
@@ -1678,7 +1929,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "water",
+    "propertyType": "triplex",
+    "sqFt": 650,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 49,
@@ -1744,7 +2001,13 @@
       }
     ],
     "allSigned": true,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 3,
+    "utilities": "water",
+    "propertyType": "house",
+    "sqFt": 2100,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 50,
@@ -1768,13 +2031,19 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "water",
+    "propertyType": "apartment",
+    "sqFt": 700,
+    "freezeWarning": false,
+    "petsAllowed": "yes"
   },
   {
     "id": 51,
     "address": "1300 A N Greensboro St",
     "leaseEnd": "7/31/26",
-    "beds": 1,
+    "beds": 2,
     "owner": "Nate and Amanda",
     "area": "Carrboro",
     "group": "unknown",
@@ -1792,13 +2061,19 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "water",
+    "propertyType": "triplex",
+    "sqFt": 900,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 52,
     "address": "1300 B N Greensboro St",
     "leaseEnd": "7/31/26",
-    "beds": 1,
+    "beds": 2,
     "owner": "Nate and Amanda",
     "area": "Carrboro",
     "group": "unknown",
@@ -1816,13 +2091,19 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "water",
+    "propertyType": "triplex",
+    "sqFt": 900,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 53,
     "address": "1300 C N Greensboro St",
     "leaseEnd": "5/31/26",
-    "beds": 1,
+    "beds": 2,
     "owner": "Nate and Amanda",
     "area": "Carrboro",
     "group": "unknown",
@@ -1840,7 +2121,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "water",
+    "propertyType": "triplex",
+    "sqFt": 900,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 54,
@@ -1871,7 +2158,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "None",
+    "propertyType": "Triplex",
+    "sqFt": 900,
+    "freezeWarning": false,
+    "petsAllowed": "Cats only, $75 fee"
   },
   {
     "id": 55,
@@ -1895,7 +2188,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "water",
+    "propertyType": "Triplex",
+    "sqFt": 750,
+    "freezeWarning": false,
+    "petsAllowed": "Cats only, $75 fee"
   },
   {
     "id": 56,
@@ -1933,7 +2232,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 3,
+    "utilities": "None",
+    "propertyType": "Townhouse",
+    "sqFt": 1294,
+    "freezeWarning": false,
+    "petsAllowed": "Cats only, $75 fee"
   },
   {
     "id": 57,
@@ -1987,7 +2292,13 @@
       }
     ],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 3,
+    "utilities": "None",
+    "propertyType": "Townhouse",
+    "sqFt": 1294,
+    "freezeWarning": false,
+    "petsAllowed": "Cats only, $75 fee"
   },
   {
     "id": 58,
@@ -2025,7 +2336,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 3,
+    "utilities": "None",
+    "propertyType": "Townhouse",
+    "sqFt": 1294,
+    "freezeWarning": false,
+    "petsAllowed": "Cats only, $75 fee"
   },
   {
     "id": 59,
@@ -2056,7 +2373,13 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 1,
+    "utilities": "None",
+    "propertyType": "Cottage",
+    "sqFt": 619,
+    "freezeWarning": false,
+    "petsAllowed": "Cats only, $75 fee"
   },
   {
     "id": 60,
@@ -2098,7 +2421,13 @@
       }
     ],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 1,
+    "utilities": "none",
+    "propertyType": "Triplex",
+    "sqFt": 900,
+    "freezeWarning": false,
+    "petsAllowed": "Cats only, $75 fee"
   },
   {
     "id": 61,
@@ -2140,13 +2469,19 @@
       }
     ],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 1,
+    "utilities": "water",
+    "propertyType": "Triplex",
+    "sqFt": 900,
+    "freezeWarning": false,
+    "petsAllowed": "Cats only, $75 fee"
   },
   {
     "id": 62,
     "address": "137 C Purefoy Rd",
     "leaseEnd": "6/30/26",
-    "beds": 2,
+    "beds": 1,
     "owner": "Carolyn",
     "area": "Purefoy",
     "group": "unknown",
@@ -2171,13 +2506,19 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "Water",
+    "propertyType": "Triplex",
+    "sqFt": 750,
+    "freezeWarning": false,
+    "petsAllowed": "Cats only, $75 fee"
   },
   {
     "id": 63,
     "address": "200 A Broad St",
     "leaseEnd": "7/31/26",
-    "beds": 2,
+    "beds": 3,
     "owner": "Steve",
     "area": "Carrboro",
     "group": "renewing",
@@ -2202,7 +2543,12 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 2,
+    "propertyType": "duplex",
+    "sqFt": 1000,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 64,
@@ -2233,13 +2579,18 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 1,
+    "propertyType": "duplex",
+    "sqFt": 700,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 65,
     "address": "207 B Oak Ave",
     "leaseEnd": "7/31/26",
-    "beds": 2,
+    "beds": 3,
     "owner": "Nate and Amanda",
     "area": "Carrboro",
     "group": "renewing",
@@ -2264,7 +2615,12 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 2.5,
+    "propertyType": "Attached House",
+    "sqFt": 1427,
+    "freezeWarning": false,
+    "petsAllowed": "Small dogs and Cat"
   },
   {
     "id": 66,
@@ -2309,7 +2665,12 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "utilities": "***check notes",
+    "propertyType": "house",
+    "sqFt": null,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 67,
@@ -2354,7 +2715,11 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "propertyType": "house",
+    "sqFt": 1368,
+    "freezeWarning": true,
+    "petsAllowed": "yes"
   },
   {
     "id": 68,
@@ -2399,7 +2764,11 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "propertyType": "House",
+    "sqFt": null,
+    "freezeWarning": false,
+    "petsAllowed": ""
   },
   {
     "id": 69,
@@ -2423,7 +2792,13 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 1,
+    "utilities": "Heat and water",
+    "propertyType": "apartment",
+    "sqFt": 600,
+    "freezeWarning": false,
+    "petsAllowed": "no"
   },
   {
     "id": 70,
@@ -2447,7 +2822,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "Heat and water",
+    "propertyType": "apartment",
+    "sqFt": 600,
+    "freezeWarning": false,
+    "petsAllowed": "no"
   },
   {
     "id": 71,
@@ -2471,7 +2852,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "Heat and water",
+    "propertyType": "apartment",
+    "sqFt": 600,
+    "freezeWarning": false,
+    "petsAllowed": "no"
   },
   {
     "id": 72,
@@ -2495,7 +2882,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "Heat and water",
+    "propertyType": "apartment",
+    "sqFt": 600,
+    "freezeWarning": false,
+    "petsAllowed": "no"
   },
   {
     "id": 73,
@@ -2519,7 +2912,13 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "Heat and water",
+    "propertyType": "apartment",
+    "sqFt": 600,
+    "freezeWarning": false,
+    "petsAllowed": "no"
   },
   {
     "id": 74,
@@ -2549,13 +2948,19 @@
       }
     ],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 1,
+    "utilities": "Heat and water",
+    "propertyType": "apartment",
+    "sqFt": 600,
+    "freezeWarning": false,
+    "petsAllowed": "no"
   },
   {
     "id": 75,
     "address": "891 MLK Jr Blvd #6",
     "leaseEnd": "5/31/26",
-    "beds": 2,
+    "beds": 1,
     "owner": "Nate",
     "area": "North of Campus",
     "group": "renewed",
@@ -2580,7 +2985,13 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 1,
+    "utilities": "Heat and water",
+    "propertyType": "apartment",
+    "sqFt": 600,
+    "freezeWarning": false,
+    "petsAllowed": "no"
   },
   {
     "id": 76,
@@ -2604,7 +3015,13 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 1,
+    "utilities": "Heat and water",
+    "propertyType": "apartment",
+    "sqFt": 600,
+    "freezeWarning": false,
+    "petsAllowed": "no"
   },
   {
     "id": 77,
@@ -2628,7 +3045,13 @@
     ],
     "nextResidents": [],
     "allSigned": true,
-    "allDeposit": true
+    "allDeposit": true,
+    "baths": 1,
+    "utilities": "Heat and water",
+    "propertyType": "apartment",
+    "sqFt": 600,
+    "freezeWarning": false,
+    "petsAllowed": "no"
   },
   {
     "id": 78,
@@ -2652,6 +3075,12 @@
     ],
     "nextResidents": [],
     "allSigned": false,
-    "allDeposit": false
+    "allDeposit": false,
+    "baths": 1,
+    "utilities": "Heat and water",
+    "propertyType": "apartment",
+    "sqFt": 600,
+    "freezeWarning": false,
+    "petsAllowed": "no"
   }
 ]
