@@ -3,3 +3,6 @@ dist/
 .env
 .DS_Store
 *.local
+
+# Raw spreadsheet exports — contain tenant PII, never commit
+src/data/csv/
