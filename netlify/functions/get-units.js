@@ -14,6 +14,8 @@
  *   GOOGLE_SERVICE_ACCOUNT_JSON, SHEET_ID  — legacy fallback
  */
 
+import { createClient } from '@supabase/supabase-js';
+
 export async function handler() {
   const {
     SUPABASE_URL,
@@ -27,7 +29,6 @@ export async function handler() {
   // ── 1. Try Supabase ─────────────────────────────────────────────────────────
   if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     try {
-      const { createClient } = await import('@supabase/supabase-js');
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
       // unit_full view joins residents + next_residents as JSON arrays
