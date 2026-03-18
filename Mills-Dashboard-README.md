@@ -44,6 +44,7 @@ A live, wall-mounted portfolio dashboard replacing the office whiteboard, renewa
 
 | Resource | Location |
 |----------|----------|
+| Repo | `~/Documents/mills-dashboard` |
 | Live app | _TODO: add Netlify URL_ |
 | Dev server | `npm run dev` → `localhost:5173` |
 | Google Sheet (source of truth) | [Renewals Spreadsheet](https://docs.google.com/spreadsheets/d/1AEZoTw-NeAz6ReOBOyN-9dzzcV5aIb4eKHS60qMOhSw/edit) |
@@ -238,12 +239,14 @@ npm run dev
 
 ## Immediate TODOs
 
+- [ ] `npm install && npm run dev` — verify app compiles and 78 seed units render
 - [ ] Create Google Cloud project and enable Sheets API
 - [ ] Create service account and share sheet with it
 - [ ] Add env vars to Netlify and deploy
 - [ ] Add "Area" header label to Sheet 1, column 17 (currently unlabeled)
 - [ ] Test copy-email buttons with real tenant data
 - [ ] Get team feedback on v2 UI
+- [ ] Push repo to GitHub and connect to Netlify
 - [ ] Research and purchase touchscreen display (55–65", 4K, <$800)
 
 ## Future: Request to Update Module (Phase 4)
