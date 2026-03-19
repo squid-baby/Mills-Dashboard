@@ -46,6 +46,7 @@ export async function handler() {
           status:      r.status      || 'unknown',
           leaseSigned: r.leaseSigned || false,
           depositPaid: r.depositPaid || false,
+          leaseEnd:    r.leaseEnd    || '',
         }));
 
         const nextResidents = (row.next_residents || []).map(r => ({
