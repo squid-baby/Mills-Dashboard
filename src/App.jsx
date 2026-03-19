@@ -11,7 +11,7 @@ const POLL_INTERVAL = 30 * 60 * 1000; // 30 minutes
 export default function App() {
   const [units, setUnits] = useState(SEED_UNITS);
   const [dataSource, setDataSource] = useState('local'); // 'local' | 'live'
-  const [lastSynced, setLastSynced] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   const [sortBy, setSortBy] = useState('date');
   const [filterGroup, setFilterGroup] = useState(null);
@@ -35,9 +35,18 @@ export default function App() {
         if (!res.ok) throw new Error(res.statusText);
         const data = await res.json();
         if (data.units && data.units.length > 0) {
-          setUnits(data.units);
+          // Only mark "Last updated" when data actually changes
+          const fingerprint = data.units.map(u =>
+            `${u.address}|${u.group}|${u.leaseEnd}|${u.beds}`
+          ).join(',');
+          setUnits(prev => {
+            const prevFingerprint = prev.map(u =>
+              `${u.address}|${u.group}|${u.leaseEnd}|${u.beds}`
+            ).join(',');
+            if (fingerprint !== prevFingerprint) setLastUpdated(new Date());
+            return data.units;
+          });
           setDataSource('live');
-          setLastSynced(new Date());
         }
       } catch {
         // Silently fall back to seed/current data
@@ -111,9 +120,9 @@ export default function App() {
     setUserNotes(prev => ({ ...prev, [unitId]: notes }));
   }, []);
 
-  // Time since last sync
-  const syncAgo = lastSynced
-    ? Math.round((Date.now() - lastSynced.getTime()) / 60000) + 'm ago'
+  // Time since last data change
+  const updatedAgo = lastUpdated
+    ? Math.round((Date.now() - lastUpdated.getTime()) / 60000) + 'm ago'
     : null;
 
   return (
@@ -146,9 +155,9 @@ export default function App() {
               MILLS RENTALS
             </h1>
             <span style={{ fontSize: 12, color: '#52525b', fontWeight: 500 }}>DASHBOARD v2.0</span>
-            {dataSource === 'live' && syncAgo && (
+            {dataSource === 'live' && updatedAgo && (
               <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 500 }}>
-                Synced {syncAgo}
+                Last updated {updatedAgo}
               </span>
             )}
             {dataSource === 'local' && (
