@@ -8,3 +8,6 @@ dist/
 src/data/csv/
 
 .claude/
+
+# Local Netlify folder
+.netlify
