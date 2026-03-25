@@ -1,0 +1,318 @@
+import { useState, useEffect } from 'react';
+import { GC } from '../data/units';
+import StatusBadge from './StatusBadge';
+import PropertyInfoTab from './PropertyInfoTab';
+
+export default function DetailPanel({ unit, onClose, onAddNote }) {
+  const [noteText, setNoteText] = useState('');
+  const [localNotes, setLocalNotes] = useState(unit._userNotes || []);
+  const [activeTab, setActiveTab] = useState('tenant');
+  const c = GC[unit.group] || GC.unknown;
+
+  useEffect(() => {
+    setLocalNotes(unit._userNotes || []);
+    setNoteText('');
+    setActiveTab('tenant');
+  }, [unit.id]);
+
+  function handleAdd() {
+    if (!noteText.trim()) return;
+    const n = { text: noteText.trim(), time: new Date().toLocaleString(), by: 'Andrea' };
+    const updated = [n, ...localNotes];
+    setLocalNotes(updated);
+    onAddNote(unit.id, updated);
+    setNoteText('');
+  }
+
+  const factPairs = [
+    ['Bedrooms', unit.beds + ' BR'],
+    ['Lease End', unit.leaseEnd],
+    ['Owner', unit.owner],
+    ['Area', unit.area],
+    ['Lease Signed', unit.allSigned ? 'Yes' : 'No'],
+    ['Deposit Paid', unit.allDeposit ? 'Yes' : 'No'],
+  ];
+  if (unit.utilities) {
+    factPairs.push(['Utilities', unit.utilities]);
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, right: 0, bottom: 0,
+      width: 'min(460px, 94vw)',
+      background: 'var(--bg-surface)',
+      borderLeft: '1px solid var(--border-default)',
+      zIndex: 100,
+      overflowY: 'auto',
+      boxShadow: '-16px 0 60px rgba(0, 0, 0, 0.5)',
+      animation: 'slideInPanel 300ms var(--ease)',
+    }}>
+      <div style={{ padding: '20px 24px' }}>
+        {/* Header */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+          marginBottom: 20,
+        }}>
+          <div>
+            <h2 style={{
+              margin: 0, fontSize: 20, fontWeight: 800,
+              color: 'var(--text-primary)',
+              letterSpacing: '-0.02em', lineHeight: 1.2,
+              fontFamily: "'JetBrains Mono', monospace",
+            }}>
+              {unit.address}
+            </h2>
+            <div style={{ marginTop: 8 }}><StatusBadge group={unit.group} /></div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-default)',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              width: 32, height: 32,
+              borderRadius: 'var(--radius-sm)',
+              fontSize: 16, lineHeight: '30px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all var(--duration-fast) ease',
+            }}
+            onMouseEnter={e => {
+              e.target.style.background = 'var(--bg-hover)';
+              e.target.style.color = 'var(--text-primary)';
+            }}
+            onMouseLeave={e => {
+              e.target.style.background = 'var(--bg-elevated)';
+              e.target.style.color = 'var(--text-muted)';
+            }}
+          >
+            x
+          </button>
+        </div>
+
+        {/* Tab bar */}
+        <div style={{
+          display: 'flex',
+          background: 'var(--bg-elevated)',
+          borderRadius: 'var(--radius-md)',
+          padding: 3,
+          marginBottom: 20,
+          border: '1px solid var(--border-subtle)',
+        }}>
+          {['tenant', 'property'].map(tab => (
+            <button
+              key={tab}
+              style={{
+                flex: 1, padding: '8px 0',
+                background: activeTab === tab ? 'var(--bg-hover)' : 'transparent',
+                border: 'none',
+                borderRadius: 'calc(var(--radius-md) - 3px)',
+                color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
+                fontSize: 12, fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all var(--duration-fast) var(--ease)',
+                letterSpacing: '0.02em',
+              }}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab === 'tenant' ? 'Tenant Info' : 'Property Info'}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'tenant' && (
+          <div style={{ animation: 'fadeIn 200ms ease' }}>
+            {/* Substate banner */}
+            <div style={{
+              background: c.color + '0c',
+              border: `1px solid ${c.color}20`,
+              borderRadius: 'var(--radius-md)',
+              padding: '10px 14px',
+              marginBottom: 20,
+              fontSize: 13, fontWeight: 500,
+              color: c.text,
+            }}>
+              {unit.substate}
+            </div>
+
+            {/* Facts grid */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
+              marginBottom: 24,
+            }}>
+              {factPairs.map(([label, value]) => (
+                <div key={label} style={{
+                  background: 'var(--bg-elevated)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '8px 12px',
+                  border: '1px solid var(--border-subtle)',
+                }}>
+                  <div style={{
+                    fontSize: 10, color: 'var(--text-muted)',
+                    textTransform: 'uppercase', letterSpacing: '0.06em',
+                    fontWeight: 600, marginBottom: 2,
+                  }}>
+                    {label}
+                  </div>
+                  <div style={{
+                    fontSize: 14, color: 'var(--text-primary)', fontWeight: 600,
+                  }}>
+                    {value === 'Yes' && <span style={{ color: '#34d399' }}>{value}</span>}
+                    {value === 'No' && <span style={{ color: '#f87171' }}>{value}</span>}
+                    {value !== 'Yes' && value !== 'No' && value}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Current Residents */}
+            <Section title={`Current Residents (${unit.residents.length})`}>
+              {unit.residents.map((r, i) => (
+                <div key={i} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '10px 0',
+                  borderBottom: i < unit.residents.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                }}>
+                  <div>
+                    <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{r.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.email}</div>
+                  </div>
+                  <span style={{
+                    fontSize: 11, padding: '2px 8px',
+                    borderRadius: 'var(--radius-sm)',
+                    fontWeight: 600,
+                    background: r.status === 'renewing' ? 'rgba(52, 211, 153, 0.1)' : r.status === 'leaving' ? 'rgba(251, 146, 60, 0.1)' : 'rgba(161, 161, 170, 0.1)',
+                    color: r.status === 'renewing' ? '#34d399' : r.status === 'leaving' ? '#fb923c' : 'var(--text-muted)',
+                    border: `1px solid ${r.status === 'renewing' ? 'rgba(52, 211, 153, 0.15)' : r.status === 'leaving' ? 'rgba(251, 146, 60, 0.15)' : 'rgba(161, 161, 170, 0.1)'}`,
+                  }}>
+                    {r.status}
+                  </span>
+                </div>
+              ))}
+            </Section>
+
+            {/* Next Year Residents */}
+            {unit.nextResidents.length > 0 && (
+              <Section title={`Next Year Residents (${unit.nextResidents.length})`}>
+                {unit.nextResidents.map((r, i) => (
+                  <div key={i} style={{
+                    padding: '10px 0',
+                    borderBottom: i < unit.nextResidents.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                  }}>
+                    <div style={{ fontSize: 13, color: '#a78bfa', fontWeight: 600 }}>{r.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                      {r.email}{r.phone ? ' / ' + r.phone : ''}
+                    </div>
+                  </div>
+                ))}
+              </Section>
+            )}
+
+            {/* Spreadsheet Notes */}
+            {(unit.notes || unit.turnoverNotes) && (
+              <Section title="Spreadsheet Notes">
+                <div style={{
+                  background: 'var(--bg-elevated)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: 12,
+                  border: '1px solid var(--border-subtle)',
+                }}>
+                  {unit.notes && (
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{unit.notes}</div>
+                  )}
+                  {unit.turnoverNotes && (
+                    <div style={{
+                      fontSize: 13, color: '#fbbf24', marginTop: unit.notes ? 8 : 0,
+                      paddingTop: unit.notes ? 8 : 0,
+                      borderTop: unit.notes ? '1px solid var(--border-subtle)' : 'none',
+                      lineHeight: 1.5,
+                    }}>
+                      Turnover: {unit.turnoverNotes}
+                    </div>
+                  )}
+                </div>
+              </Section>
+            )}
+
+            {/* Quick Notes */}
+            <Section title="Quick Notes">
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <input
+                  type="text" value={noteText}
+                  onChange={e => setNoteText(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
+                  placeholder="Add a note..."
+                  style={{
+                    flex: 1,
+                    background: 'var(--bg-input)',
+                    border: '1px solid var(--border-default)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '9px 12px',
+                    color: 'var(--text-primary)',
+                    fontSize: 13, outline: 'none',
+                    transition: 'border-color var(--duration-fast) ease',
+                  }}
+                  onFocus={e => e.target.style.borderColor = 'rgba(99, 102, 241, 0.5)'}
+                  onBlur={e => e.target.style.borderColor = 'var(--border-default)'}
+                />
+                <button
+                  onClick={handleAdd}
+                  style={{
+                    background: c.color,
+                    border: 'none',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '0 16px',
+                    color: '#000', fontWeight: 700, fontSize: 16,
+                    cursor: 'pointer',
+                    transition: 'opacity var(--duration-fast) ease',
+                  }}
+                >
+                  +
+                </button>
+              </div>
+              {localNotes.map((n, i) => (
+                <div key={i} style={{
+                  padding: '8px 12px',
+                  background: 'var(--bg-elevated)',
+                  borderRadius: 'var(--radius-sm)',
+                  marginBottom: 6,
+                  borderLeft: `3px solid ${c.color}`,
+                  animation: i === 0 && localNotes.length > 1 ? 'slideUp 200ms var(--ease)' : 'none',
+                }}>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.4 }}>{n.text}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>{n.by} / {n.time}</div>
+                </div>
+              ))}
+              {localNotes.length === 0 && (
+                <div style={{ fontSize: 13, color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                  No notes yet.
+                </div>
+              )}
+            </Section>
+          </div>
+        )}
+
+        {activeTab === 'property' && (
+          <div style={{ animation: 'fadeIn 200ms ease' }}>
+            <PropertyInfoTab unit={unit} accentColor={c.color} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children }) {
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <h3 style={{
+        margin: '0 0 10px', fontSize: 11, fontWeight: 700,
+        color: 'var(--text-muted)',
+        textTransform: 'uppercase', letterSpacing: '0.08em',
+      }}>
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
