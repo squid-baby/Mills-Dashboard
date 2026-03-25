@@ -11,6 +11,8 @@
  *   SHEET_ID_PROPERTY_INFO      - the Google Sheets document ID for Property Info
  */
 
+import { google } from 'googleapis';
+
 // Maps field keys → sheet column headers (reverse of HEADER_TO_FIELD in get-property-info.js)
 const FIELD_TO_HEADER = {
   'address':                  'Property',
@@ -77,7 +79,6 @@ export async function handler(event) {
 
   const t0 = Date.now();
   try {
-    const { google } = await import('googleapis');
     const credentials = JSON.parse(GOOGLE_SERVICE_ACCOUNT_JSON);
     const auth = new google.auth.GoogleAuth({
       credentials,

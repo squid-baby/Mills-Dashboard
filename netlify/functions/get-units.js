@@ -11,8 +11,7 @@
  *   SHEET_TAB_PROPERTIES        - tab name for property info (default: "Sheet2")
  */
 
-// Dynamic import so the function still loads when googleapis isn't installed
-// (local dev without the dependency). In that case it returns an empty result.
+import { google } from 'googleapis';
 
 export async function handler() {
   const {
@@ -32,8 +31,6 @@ export async function handler() {
 
   const t0 = Date.now();
   try {
-    const { google } = await import('googleapis');
-
     const credentials = JSON.parse(GOOGLE_SERVICE_ACCOUNT_JSON);
     const auth = new google.auth.GoogleAuth({
       credentials,

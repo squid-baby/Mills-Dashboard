@@ -9,6 +9,8 @@
  *   SHEET_ID_PROPERTY_INFO      - the Google Sheets document ID for Property Info
  */
 
+import { google } from 'googleapis';
+
 // Maps sheet column headers → field keys used in the dashboard
 const HEADER_TO_FIELD = {
   'Property':                   'address',
@@ -58,7 +60,6 @@ export async function handler(event) {
 
   const t0 = Date.now();
   try {
-    const { google } = await import('googleapis');
     const credentials = JSON.parse(GOOGLE_SERVICE_ACCOUNT_JSON);
     const auth = new google.auth.GoogleAuth({
       credentials,
