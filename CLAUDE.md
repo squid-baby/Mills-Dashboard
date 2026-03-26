@@ -1,5 +1,7 @@
 # Mills Rentals Dashboard
 
+**Production URL**: https://mills-dashboard.netlify.app
+
 ## Architecture
 
 ### Data Sources
