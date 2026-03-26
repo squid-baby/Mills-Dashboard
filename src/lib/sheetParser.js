@@ -10,7 +10,9 @@ const S1 = {
   PROPERTY: 0,
   RESIDENT: 1,
   EMAIL: 2,
-  LEASE_END: 3,
+  PHONE: 3,
+  LEASE_END: 4,
+  MOVE_OUT: 5,
   STATUS: 6,
   LEASE_SIGNED: 7,
   DEPOSIT_PAID: 8,
@@ -18,11 +20,12 @@ const S1 = {
   NEXT_RESIDENT: 10,
   NEXT_EMAIL: 11,
   NEXT_PHONE: 12,
-  NEXT_LEASE_END: 13,
-  TURNOVER_NOTES: 14,
-  FREEZE_WARNING: 15,
-  OWNER: 16,
-  AREA: 17,
+  NEXT_MOVE_IN: 13,
+  NEXT_LEASE_END: 14,
+  TURNOVER_NOTES: 15,
+  FREEZE_WARNING: 16,
+  OWNER: 17,
+  AREA: 18,
 };
 
 // ─── Column indices for Sheet 2 ─────────────────────────────────────────────
@@ -192,6 +195,7 @@ export function parseSheets(sheet1Rows, sheet2Rows) {
     const residents = withNames.map(r => ({
       name:        clean(r[S1.RESIDENT]),
       email:       clean(r[S1.EMAIL]),
+      phone:       clean(r[S1.PHONE]),
       status:      clean(r[S1.STATUS]).toLowerCase(),
       leaseSigned: yn(r[S1.LEASE_SIGNED]),
       depositPaid: yn(r[S1.DEPOSIT_PAID]),
@@ -217,6 +221,8 @@ export function parseSheets(sheet1Rows, sheet2Rows) {
     // Grab first non-blank values for unit-level fields
     const first = nonAirbnb[0];
     const leaseEnd = clean(first[S1.LEASE_END]);
+    const moveOutDate = nonAirbnb.map(r => clean(r[S1.MOVE_OUT])).find(v => v) || '';
+    const moveInDate = nonAirbnb.map(r => clean(r[S1.NEXT_MOVE_IN])).find(v => v) || '';
     const owner = nonAirbnb.map(r => clean(r[S1.OWNER])).find(v => v) || '';
     const area = nonAirbnb.map(r => clean(r[S1.AREA])).find(v => v) || '';
 
@@ -243,6 +249,8 @@ export function parseSheets(sheet1Rows, sheet2Rows) {
       id: id++,
       address,
       leaseEnd,
+      moveOutDate,
+      moveInDate,
       beds: beds ? parseInt(beds, 10) || beds : 0,
       baths: info.baths || '',
       owner,

@@ -1,57 +1,43 @@
 /**
  * Netlify Function: GET /api/get-units
  *
- * Fetches both sheets from the Google Spreadsheet using a service account,
- * parses them into dashboard unit objects, and returns JSON.
+ * Fetches tenant/renewal data from Supabase (unit_full view) and returns
+ * dashboard-ready unit objects with derived status groups.
  *
  * Required env vars:
- *   GOOGLE_SERVICE_ACCOUNT_JSON - full JSON key for the service account
- *   SHEET_ID                    - the Google Sheets document ID
- *   SHEET_TAB_RENEWALS          - tab name for renewals (default: "Sheet1")
- *   SHEET_TAB_PROPERTIES        - tab name for property info (default: "Sheet2")
+ *   SUPABASE_URL         - Supabase project URL
+ *   SUPABASE_SERVICE_KEY  - Supabase service role key
  */
 
-import { google } from 'googleapis';
-
 export async function handler() {
-  const {
-    GOOGLE_SERVICE_ACCOUNT_JSON,
-    SHEET_ID,
-    SHEET_TAB_RENEWALS = 'Sheet1',
-    SHEET_TAB_PROPERTIES = 'Sheet2',
-  } = process.env;
+  const { SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env;
 
-  if (!GOOGLE_SERVICE_ACCOUNT_JSON || !SHEET_ID) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ units: [], source: 'none', error: 'Missing credentials or sheet ID' }),
+      body: JSON.stringify({ units: [], source: 'none', error: 'Missing Supabase credentials' }),
     };
   }
 
   const t0 = Date.now();
   try {
-    const credentials = JSON.parse(GOOGLE_SERVICE_ACCOUNT_JSON);
-    const auth = new google.auth.GoogleAuth({
-      credentials,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+    // Fetch all units with nested residents + next_residents from the view
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/unit_full?select=*&order=address`, {
+      headers: {
+        apikey: SUPABASE_SERVICE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      },
     });
-    const sheets = google.sheets({ version: 'v4', auth });
 
-    // Fetch both tabs in parallel
-    const [renewalsRes, propertiesRes] = await Promise.all([
-      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${SHEET_TAB_RENEWALS}!A:AA` }),
-      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${SHEET_TAB_PROPERTIES}!A:AA` }),
-    ]);
+    if (!res.ok) {
+      throw new Error(`Supabase returned ${res.status}: ${await res.text()}`);
+    }
 
-    const sheet1Rows = renewalsRes.data.values || [];
-    const sheet2Rows = propertiesRes.data.values || [];
+    const rows = await res.json();
+    const units = rows.map((row, i) => buildUnit(row, i + 1));
 
-    // Use the shared parser — import relative path from the project source
-    // Since Netlify Functions bundle from the functions dir, we use a simple inline version
-    const units = parseSheets(sheet1Rows, sheet2Rows);
-
-    console.log(`[get-units] OK — ${units.length} units | sheet1: ${sheet1Rows.length - 1} rows | sheet2: ${sheet2Rows.length - 1} rows | ${Date.now() - t0}ms`);
+    console.log(`[get-units] OK — ${units.length} units | ${Date.now() - t0}ms`);
 
     return {
       statusCode: 200,
@@ -68,18 +54,121 @@ export async function handler() {
   }
 }
 
-// ─── Inline parser (mirrors src/lib/sheetParser.js) ─────────────────────────
-// Duplicated here because Netlify Functions bundle independently from the Vite app.
+// ─── Transform a Supabase unit_full row into dashboard shape ────────────────
 
-function yn(val) {
-  return (val || '').toString().trim().toLowerCase() === 'yes';
+function buildUnit(row, id) {
+  const rawResidents = row.residents || [];
+  const rawNext = row.next_residents || [];
+
+  // Extract unit-level dates from raw data before mapping
+  const leaseEnd = rawResidents.length > 0
+    ? formatDate(rawResidents[0].leaseEnd || rawResidents[0].lease_end || '')
+    : '';
+  const moveOutDate = rawResidents.map(r => r.moveOutDate || r.move_out_date || '').find(v => v) || '';
+  const moveInDate = rawNext.map(r => r.moveInDate || r.move_in_date || '').find(v => v) || '';
+
+  // Deduplicate residents by email (view can return dupes from joins)
+  const seenResidents = new Set();
+  const residents = [];
+  for (const r of rawResidents) {
+    const key = r.email || r.name || r.id;
+    if (seenResidents.has(key)) continue;
+    seenResidents.add(key);
+    residents.push({
+      name: r.name || '',
+      email: r.email || '',
+      phone: r.phone || '',
+      status: (r.status || '').toLowerCase(),
+      leaseSigned: !!r.leaseSigned,
+      depositPaid: !!r.depositPaid,
+    });
+  }
+
+  // Deduplicate next residents
+  const seenNext = new Set();
+  const nextResidents = [];
+  for (const r of rawNext) {
+    const key = r.email || r.name || r.id;
+    if (seenNext.has(key)) continue;
+    seenNext.add(key);
+    nextResidents.push({
+      name: r.name || '',
+      email: r.email || '',
+      phone: r.phone || '',
+    });
+  }
+
+  // Collect notes from raw data (mapped residents don't have notes field)
+  const notes = [...new Set(rawResidents.map(r => r.notes || '').filter(Boolean))].join('; ');
+  const turnoverNotes = '';
+
+  const group = deriveGroup(residents, nextResidents);
+  const substate = deriveSubstate(group, residents, nextResidents);
+
+  const allSigned = residents.length > 0 && residents.every(r =>
+    r.status === 'leaving' || r.leaseSigned
+  );
+  const allDeposit = residents.length > 0 && residents.every(r =>
+    r.status === 'leaving' || r.depositPaid
+  );
+
+  return {
+    id,
+    address: row.address || '',
+    leaseEnd,
+    moveOutDate: formatDate(moveOutDate),
+    moveInDate: formatDate(moveInDate),
+    beds: row.beds ? parseInt(row.beds, 10) || row.beds : 0,
+    baths: row.baths || '',
+    owner: row.owner_name || '',
+    area: row.area || '',
+    group,
+    substate,
+    notes,
+    turnoverNotes,
+    utilities: row.utilities || '',
+    residents: residents.map(r => ({
+      name: r.name,
+      email: r.email,
+      phone: r.phone,
+      status: r.status,
+      leaseSigned: r.leaseSigned,
+      depositPaid: r.depositPaid,
+    })),
+    nextResidents: nextResidents.map(r => ({
+      name: r.name,
+      email: r.email,
+      phone: r.phone,
+    })),
+    allSigned,
+    allDeposit,
+    propertyInfo: {
+      propertyType: row.property_type || '',
+      sqft: row.sq_ft || '',
+      freezeWarning: !!row.freeze_warning,
+      petsAllowed: row.pets_allowed || '',
+      yearBuilt: row.year_built || '',
+    },
+  };
 }
 
-function clean(val) {
+// ─── Format date from ISO (2026-07-31) to M/D/YY ───────────────────────────
+
+function formatDate(val) {
   if (!val) return '';
-  const s = val.toString().trim();
-  return /^[—–-]+$/.test(s) ? '' : s;
+  const str = val.toString().trim();
+  // Already in M/D/YY format
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(str)) return str;
+  // ISO format: 2026-07-31
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const [, y, m, d] = match;
+    return `${parseInt(m)}/${parseInt(d)}/${y.slice(2)}`;
+  }
+  return str;
 }
+
+// ─── Group derivation (same logic as before) ────────────────────────────────
 
 function deriveGroup(residents, nextResidents) {
   if (residents.length === 0) return 'unknown';
@@ -111,78 +200,4 @@ function deriveSubstate(group, residents, nextResidents) {
     case 'month_to_month': return 'Month-to-month';
     default: return '';
   }
-}
-
-function parseSheets(sheet1Rows, sheet2Rows) {
-  const propInfo = {};
-  for (let i = 1; i < sheet2Rows.length; i++) {
-    const row = sheet2Rows[i];
-    const addr = clean(row[0]);
-    if (!addr) continue;
-    propInfo[addr] = {
-      beds: clean(row[1]), baths: clean(row[2]), utilities: clean(row[10]), area: clean(row[24]),
-      propertyInfo: {
-        washer: yn(row[3]), dryer: yn(row[4]), dishwasher: yn(row[5]),
-        town: clean(row[6]), propertyType: clean(row[7]), sqft: clean(row[8]),
-        gas: yn(row[9]), freezeWarning: yn(row[11]), sumpPump: yn(row[12]),
-        breakerBox: clean(row[13]), waterHeaterLocation: clean(row[14]),
-        acType: clean(row[15]), heatType: clean(row[16]), petsAllowed: yn(row[17]),
-        yearBuilt: clean(row[18]), sheetNotes: clean(row[21]),
-      },
-    };
-  }
-
-  const groups = new Map();
-  for (let i = 1; i < sheet1Rows.length; i++) {
-    const row = sheet1Rows[i];
-    const addr = clean(row[0]);
-    if (!addr) continue;
-    if (!groups.has(addr)) groups.set(addr, []);
-    groups.get(addr).push(row);
-  }
-
-  const units = [];
-  let id = 1;
-  for (const [address, rows] of groups) {
-    const nonAirbnb = rows.filter(r => (r[1] || '').toString().trim().toLowerCase() !== 'airbnb');
-    if (nonAirbnb.length === 0) continue;
-    const withNames = nonAirbnb.filter(r => clean(r[1]));
-    const residents = withNames.map(r => ({
-      name: clean(r[1]), email: clean(r[2]), status: clean(r[6]).toLowerCase(),
-      leaseSigned: yn(r[7]), depositPaid: yn(r[8]),
-    }));
-    const seenEmails = new Set();
-    const nextResidents = [];
-    for (const r of nonAirbnb) {
-      const name = clean(r[10]);
-      const email = clean(r[11]);
-      if (!name) continue;
-      const key = email || name;
-      if (seenEmails.has(key)) continue;
-      seenEmails.add(key);
-      nextResidents.push({ name, email, phone: clean(r[12]) });
-    }
-    const first = nonAirbnb[0];
-    const leaseEnd = clean(first[3]);
-    const owner = nonAirbnb.map(r => clean(r[16])).find(v => v) || '';
-    const area = nonAirbnb.map(r => clean(r[17])).find(v => v) || '';
-    const notes = [...new Set(nonAirbnb.map(r => clean(r[9])).filter(Boolean))].join('; ');
-    const turnoverNotes = [...new Set(nonAirbnb.map(r => clean(r[14])).filter(Boolean))].join('; ');
-    const group = deriveGroup(residents, nextResidents);
-    const substate = deriveSubstate(group, residents, nextResidents);
-    const info = propInfo[address] || {};
-    const beds = info.beds || '';
-    const allSigned = residents.length > 0 && residents.every(r => r.status === 'leaving' || r.leaseSigned);
-    const allDeposit = residents.length > 0 && residents.every(r => r.status === 'leaving' || r.depositPaid);
-    units.push({
-      id: id++, address, leaseEnd,
-      beds: beds ? parseInt(beds, 10) || beds : 0,
-      baths: info.baths || '',
-      owner, area: area || info.area || '', group, substate,
-      notes, turnoverNotes, utilities: info.utilities || '',
-      residents, nextResidents, allSigned, allDeposit,
-      propertyInfo: info.propertyInfo || {},
-    });
-  }
-  return units;
 }

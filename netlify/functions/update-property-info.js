@@ -16,10 +16,10 @@ import { google } from 'googleapis';
 // Maps field keys → sheet column headers (reverse of HEADER_TO_FIELD in get-property-info.js)
 const FIELD_TO_HEADER = {
   'address':                  'Property',
-  'door_code':                'Door Codes',
-  'lockbox_code':             'Lock Box and Key Number',
-  'water_heater_location':    'Hot water heater',
-  'notes':                    'notes',
+  'door_code':                'Door Code',
+  'lockbox_code':             'Lockbox Code',
+  'water_heater_location':    'Water Heater Location',
+  'notes':                    'Notes',
   'filter_size':              'Filter #1',
   'filter_size_2':            'Filter #2',
   'alarm_code':               'Alarm Code',

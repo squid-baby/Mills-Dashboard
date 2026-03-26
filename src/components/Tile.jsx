@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { GC, daysUntil } from '../data/units';
+import { GC, getAlerts } from '../data/units';
 
 export default function Tile({ unit, onClick, index = 0 }) {
   const [hovered, setHovered] = useState(false);
   const c = GC[unit.group] || GC.unknown;
-  const days = daysUntil(unit.leaseEnd);
-  const urgent = days <= 30 && !['renewed', 'turnover_rented', 'month_to_month'].includes(unit.group);
+  const alerts = getAlerts(unit);
+  const urgent = alerts.length > 0;
+  const topAlert = alerts[0]; // worst alert for badge display
 
   return (
     <div
@@ -39,8 +40,8 @@ export default function Tile({ unit, onClick, index = 0 }) {
         borderRadius: '10px 0 0 10px',
       }} />
 
-      {/* Urgent badge */}
-      {urgent && (
+      {/* Alert badge */}
+      {topAlert && (
         <div style={{
           position: 'absolute', top: 8, right: 8,
           background: 'rgba(239, 68, 68, 0.15)',
@@ -50,8 +51,34 @@ export default function Tile({ unit, onClick, index = 0 }) {
           borderRadius: 'var(--radius-sm)',
           border: '1px solid rgba(239, 68, 68, 0.2)',
         }}>
-          {days <= 0 ? 'OVERDUE' : days + 'd'}
+          {topAlert.label}
         </div>
+      )}
+
+      {/* Inspection condition dot */}
+      {unit._inspectionCondition && (
+        <div
+          title={
+            unit._inspectionCondition === 'up_to_date' ? 'Inspection: Up to date' :
+            unit._inspectionCondition === 'needs_love' ? 'Inspection: Needs love' :
+            'Inspection: At risk'
+          }
+          style={{
+            position: 'absolute',
+            top: topAlert ? 28 : 8,
+            right: 10,
+            width: 7, height: 7,
+            borderRadius: '50%',
+            background:
+              unit._inspectionCondition === 'up_to_date' ? '#34d399' :
+              unit._inspectionCondition === 'needs_love' ? '#fbbf24' :
+              '#f87171',
+            boxShadow:
+              unit._inspectionCondition === 'up_to_date' ? '0 0 6px rgba(52, 211, 153, 0.5)' :
+              unit._inspectionCondition === 'needs_love' ? '0 0 6px rgba(251, 191, 36, 0.5)' :
+              '0 0 6px rgba(248, 113, 113, 0.5)',
+          }}
+        />
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>

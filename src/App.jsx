@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { GC, PRIO, SORT_OPTS, SEED_UNITS, parseDate, fmtMonth } from './data/units';
+import { GC, PRIO, SORT_OPTS, SEED_UNITS, parseDate, fmtMonth, daysUntil } from './data/units';
 import StatusBadge from './components/StatusBadge';
 import Tile from './components/Tile';
 import DetailPanel from './components/DetailPanel';
@@ -7,6 +7,67 @@ import SummaryBar from './components/SummaryBar';
 import GroupHeader from './components/GroupHeader';
 
 const POLL_INTERVAL = 30 * 60 * 1000; // 30 minutes
+
+function exportTurnoverData(units, inspectionConditions) {
+  // Filter to units with a future move-in date
+  const now = new Date();
+  const turnoverUnits = units.filter(u => {
+    if (!u.moveInDate) return false;
+    const parts = u.moveInDate.split('/').map(Number);
+    const moveIn = new Date(2000 + (parts[2] < 100 ? parts[2] : parts[2] - 2000), parts[0] - 1, parts[1]);
+    return moveIn >= now;
+  });
+
+  if (turnoverUnits.length === 0) {
+    alert('No turnover units with future move-in dates to export.');
+    return;
+  }
+
+  const conditionLabel = (c) =>
+    c === 'up_to_date' ? 'Up to date' :
+    c === 'needs_love' ? 'Needs love' :
+    c === 'at_risk' ? 'At risk' : '';
+
+  const escCSV = (v) => {
+    const s = (v || '').toString();
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+
+  const headers = ['Address', 'Beds', 'Lease End', 'Move Out', 'Move In', 'Turn Window (days)', 'Current Tenants', 'Next Tenants', 'Overall Condition', 'Turnover Notes'];
+  const rows = turnoverUnits.map(u => {
+    let windowDays = '';
+    if (u.moveOutDate && u.moveInDate) {
+      const pOut = u.moveOutDate.split('/').map(Number);
+      const pIn = u.moveInDate.split('/').map(Number);
+      const out = new Date(2000 + (pOut[2] < 100 ? pOut[2] : pOut[2] - 2000), pOut[0] - 1, pOut[1]);
+      const inn = new Date(2000 + (pIn[2] < 100 ? pIn[2] : pIn[2] - 2000), pIn[0] - 1, pIn[1]);
+      windowDays = Math.ceil((inn - out) / 864e5);
+    }
+    return [
+      u.address,
+      u.beds,
+      u.leaseEnd,
+      u.moveOutDate,
+      u.moveInDate,
+      windowDays,
+      u.residents.map(r => r.name).join('; '),
+      u.nextResidents.map(r => r.name).join('; '),
+      conditionLabel(inspectionConditions[u.address] || ''),
+      u.turnoverNotes,
+    ].map(escCSV).join(',');
+  });
+
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `mills-turnovers-${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 export default function App() {
   const [units, setUnits] = useState(SEED_UNITS);
@@ -21,6 +82,7 @@ export default function App() {
   const [userNotes, setUserNotes] = useState(() => {
     try { return JSON.parse(localStorage.getItem('mills_notes') || '{}'); } catch { return {}; }
   });
+  const [inspectionConditions, setInspectionConditions] = useState({});
 
   // Persist notes to localStorage
   useEffect(() => {
@@ -48,10 +110,24 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Enrich units with user notes
+  // Fetch inspection conditions
+  useEffect(() => {
+    fetch('/api/get-all-inspections')
+      .then(r => r.json())
+      .then(data => {
+        if (data.inspections) setInspectionConditions(data.inspections);
+      })
+      .catch(() => { /* ignore */ });
+  }, [units]); // re-fetch when units refresh
+
+  // Enrich units with user notes and inspection conditions
   const enriched = useMemo(() =>
-    units.map(u => ({ ...u, _userNotes: userNotes[u.id] || [] })),
-    [units, userNotes]
+    units.map(u => ({
+      ...u,
+      _userNotes: userNotes[u.id] || [],
+      _inspectionCondition: inspectionConditions[u.address] || null,
+    })),
+    [units, userNotes, inspectionConditions]
   );
 
   // Filter
@@ -321,6 +397,23 @@ export default function App() {
           )}
 
           <div style={{ flex: 1 }} />
+
+          <button
+            onClick={() => exportTurnoverData(enriched, inspectionConditions)}
+            style={{
+              background: 'var(--bg-elevated)',
+              color: 'var(--text-muted)',
+              border: '1px solid var(--border-default)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '5px 10px',
+              fontSize: 11, fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all var(--duration-fast) ease',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Export Turnovers
+          </button>
 
           <span style={{
             fontSize: 12, color: 'var(--text-muted)', fontWeight: 500,

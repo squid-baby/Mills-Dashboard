@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { GC } from '../data/units';
+import { GC, getAlerts, parseDate, daysUntil } from '../data/units';
 import StatusBadge from './StatusBadge';
 import PropertyInfoTab from './PropertyInfoTab';
+import TurnoverTab from './TurnoverTab';
 
 export default function DetailPanel({ unit, onClose, onAddNote }) {
   const [noteText, setNoteText] = useState('');
@@ -24,6 +25,21 @@ export default function DetailPanel({ unit, onClose, onAddNote }) {
     setNoteText('');
   }
 
+  const isTurnover = ['full_turnover', 'partial_turn', 'turnover_rented', 'partial_turn_leased'].includes(unit.group);
+  const alerts = getAlerts(unit);
+
+  // Calculate turn window
+  let turnWindowDays = null;
+  let turnWindowColor = 'var(--text-primary)';
+  if (isTurnover && unit.moveOutDate && unit.moveInDate) {
+    const out = parseDate(unit.moveOutDate);
+    const inn = parseDate(unit.moveInDate);
+    turnWindowDays = Math.ceil((inn - out) / 864e5);
+    if (turnWindowDays <= 7) turnWindowColor = '#f87171';
+    else if (turnWindowDays <= 14) turnWindowColor = '#fbbf24';
+    else turnWindowColor = '#34d399';
+  }
+
   const factPairs = [
     ['Bedrooms', unit.beds + ' BR'],
     ['Lease End', unit.leaseEnd],
@@ -34,6 +50,15 @@ export default function DetailPanel({ unit, onClose, onAddNote }) {
   ];
   if (unit.utilities) {
     factPairs.push(['Utilities', unit.utilities]);
+  }
+  if (isTurnover && unit.moveOutDate) {
+    factPairs.push(['Move Out', unit.moveOutDate]);
+  }
+  if (isTurnover && unit.moveInDate) {
+    factPairs.push(['Move In', unit.moveInDate]);
+  }
+  if (turnWindowDays !== null) {
+    factPairs.push(['Turn Window', turnWindowDays + ' days']);
   }
 
   return (
@@ -99,23 +124,27 @@ export default function DetailPanel({ unit, onClose, onAddNote }) {
           marginBottom: 20,
           border: '1px solid var(--border-subtle)',
         }}>
-          {['tenant', 'property'].map(tab => (
+          {[
+            { key: 'tenant', label: 'Tenant Info' },
+            { key: 'property', label: 'Property Info' },
+            ...(isTurnover ? [{ key: 'turnover', label: 'Turnover' }] : []),
+          ].map(tab => (
             <button
-              key={tab}
+              key={tab.key}
               style={{
                 flex: 1, padding: '8px 0',
-                background: activeTab === tab ? 'var(--bg-hover)' : 'transparent',
+                background: activeTab === tab.key ? 'var(--bg-hover)' : 'transparent',
                 border: 'none',
                 borderRadius: 'calc(var(--radius-md) - 3px)',
-                color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
+                color: activeTab === tab.key ? 'var(--text-primary)' : 'var(--text-muted)',
                 fontSize: 12, fontWeight: 600,
                 cursor: 'pointer',
                 transition: 'all var(--duration-fast) var(--ease)',
                 letterSpacing: '0.02em',
               }}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => setActiveTab(tab.key)}
             >
-              {tab === 'tenant' ? 'Tenant Info' : 'Property Info'}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -128,12 +157,30 @@ export default function DetailPanel({ unit, onClose, onAddNote }) {
               border: `1px solid ${c.color}20`,
               borderRadius: 'var(--radius-md)',
               padding: '10px 14px',
-              marginBottom: 20,
+              marginBottom: alerts.length > 0 ? 10 : 20,
               fontSize: 13, fontWeight: 500,
               color: c.text,
             }}>
               {unit.substate}
             </div>
+
+            {/* Active alerts */}
+            {alerts.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
+                {alerts.map((a, i) => (
+                  <span key={i} style={{
+                    fontSize: 11, fontWeight: 700, letterSpacing: '0.03em',
+                    padding: '3px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: a.severity === 'critical' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(251, 191, 36, 0.15)',
+                    color: a.severity === 'critical' ? '#f87171' : '#fbbf24',
+                    border: `1px solid ${a.severity === 'critical' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(251, 191, 36, 0.25)'}`,
+                  }}>
+                    {a.label}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {/* Facts grid */}
             <div style={{
@@ -155,11 +202,13 @@ export default function DetailPanel({ unit, onClose, onAddNote }) {
                     {label}
                   </div>
                   <div style={{
-                    fontSize: 14, color: 'var(--text-primary)', fontWeight: 600,
+                    fontSize: 14, fontWeight: 600,
+                    color: label === 'Turn Window' ? turnWindowColor
+                      : value === 'Yes' ? '#34d399'
+                      : value === 'No' ? '#f87171'
+                      : 'var(--text-primary)',
                   }}>
-                    {value === 'Yes' && <span style={{ color: '#34d399' }}>{value}</span>}
-                    {value === 'No' && <span style={{ color: '#f87171' }}>{value}</span>}
-                    {value !== 'Yes' && value !== 'No' && value}
+                    {value}
                   </div>
                 </div>
               ))}
@@ -169,24 +218,34 @@ export default function DetailPanel({ unit, onClose, onAddNote }) {
             <Section title={`Current Residents (${unit.residents.length})`}>
               {unit.residents.map((r, i) => (
                 <div key={i} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   padding: '10px 0',
                   borderBottom: i < unit.residents.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                 }}>
-                  <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{r.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.email}</div>
+                    <span style={{
+                      fontSize: 11, padding: '2px 8px',
+                      borderRadius: 'var(--radius-sm)',
+                      fontWeight: 600,
+                      background: r.status === 'renewing' ? 'rgba(52, 211, 153, 0.1)' : r.status === 'leaving' ? 'rgba(251, 146, 60, 0.1)' : 'rgba(161, 161, 170, 0.1)',
+                      color: r.status === 'renewing' ? '#34d399' : r.status === 'leaving' ? '#fb923c' : 'var(--text-muted)',
+                      border: `1px solid ${r.status === 'renewing' ? 'rgba(52, 211, 153, 0.15)' : r.status === 'leaving' ? 'rgba(251, 146, 60, 0.15)' : 'rgba(161, 161, 170, 0.1)'}`,
+                    }}>
+                      {r.status}
+                    </span>
                   </div>
-                  <span style={{
-                    fontSize: 11, padding: '2px 8px',
-                    borderRadius: 'var(--radius-sm)',
-                    fontWeight: 600,
-                    background: r.status === 'renewing' ? 'rgba(52, 211, 153, 0.1)' : r.status === 'leaving' ? 'rgba(251, 146, 60, 0.1)' : 'rgba(161, 161, 170, 0.1)',
-                    color: r.status === 'renewing' ? '#34d399' : r.status === 'leaving' ? '#fb923c' : 'var(--text-muted)',
-                    border: `1px solid ${r.status === 'renewing' ? 'rgba(52, 211, 153, 0.15)' : r.status === 'leaving' ? 'rgba(251, 146, 60, 0.15)' : 'rgba(161, 161, 170, 0.1)'}`,
-                  }}>
-                    {r.status}
-                  </span>
+                  {r.email && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.email}</span>
+                      <CopyButton text={r.email} />
+                    </div>
+                  )}
+                  {r.phone && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.phone}</span>
+                      <CopyButton text={r.phone} />
+                    </div>
+                  )}
                 </div>
               ))}
             </Section>
@@ -200,9 +259,18 @@ export default function DetailPanel({ unit, onClose, onAddNote }) {
                     borderBottom: i < unit.nextResidents.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                   }}>
                     <div style={{ fontSize: 13, color: '#a78bfa', fontWeight: 600 }}>{r.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                      {r.email}{r.phone ? ' / ' + r.phone : ''}
-                    </div>
+                    {r.email && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.email}</span>
+                        <CopyButton text={r.email} />
+                      </div>
+                    )}
+                    {r.phone && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.phone}</span>
+                        <CopyButton text={r.phone} />
+                      </div>
+                    )}
                   </div>
                 ))}
               </Section>
@@ -297,6 +365,12 @@ export default function DetailPanel({ unit, onClose, onAddNote }) {
             <PropertyInfoTab unit={unit} accentColor={c.color} />
           </div>
         )}
+
+        {activeTab === 'turnover' && (
+          <div style={{ animation: 'fadeIn 200ms ease' }}>
+            <TurnoverTab unit={unit} accentColor={c.color} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -314,5 +388,41 @@ function Section({ title, children }) {
       </h3>
       {children}
     </div>
+  );
+}
+
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  if (!text) return null;
+  return (
+    <button
+      onClick={e => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(text).catch(() => {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        });
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+      style={{
+        background: copied ? 'rgba(52, 211, 153, 0.15)' : 'var(--bg-elevated)',
+        border: `1px solid ${copied ? 'rgba(52, 211, 153, 0.3)' : 'var(--border-subtle)'}`,
+        borderRadius: 'var(--radius-sm)',
+        padding: '1px 6px',
+        fontSize: 10, fontWeight: 600,
+        color: copied ? '#34d399' : 'var(--text-muted)',
+        cursor: 'pointer',
+        transition: 'all 150ms ease',
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+      }}
+    >
+      {copied ? 'Copied!' : 'Copy'}
+    </button>
   );
 }

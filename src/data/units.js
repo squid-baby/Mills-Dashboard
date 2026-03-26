@@ -131,5 +131,46 @@ export const PROPERTY_INFO_FIELDS = [
   },
 ];
 
+// ─── Alert / flagging logic ──────────────────────────────────────────────────
+export function getAlerts(unit) {
+  const alerts = [];
+  const days = daysUntil(unit.leaseEnd);
+  const now = new Date();
+  const leaseDate = parseDate(unit.leaseEnd);
+  const leaseYear = leaseDate.getFullYear();
+  const isResolved = ['renewed', 'turnover_rented', 'month_to_month'].includes(unit.group);
+
+  // 1. "4+B Unrented" — 4+ bed, past Nov 1 (year before lease ends) or Jan 1 (lease end year)
+  if (unit.beds >= 4 && !isResolved) {
+    const nov1 = new Date(leaseYear - 1, 10, 1);
+    const jan1 = new Date(leaseYear, 0, 1);
+    if (now >= nov1) {
+      alerts.push({ label: '4+B Unrented', severity: now >= jan1 ? 'critical' : 'warning' });
+    }
+  }
+
+  // 2. "Needs Attention" — lease ended 30+ days ago and still not resolved
+  if (!isResolved && days <= -30) {
+    alerts.push({ label: 'Needs Attention', severity: 'warning' });
+  }
+
+  // 3. "OVERDUE" — lease ended (or within 30 days) and not resolved
+  if (!isResolved && days <= 0 && days > -30) {
+    alerts.push({ label: 'OVERDUE', severity: 'critical' });
+  }
+
+  // 4. Existing urgent: within 30 days of lease end, not resolved
+  if (!isResolved && days > 0 && days <= 30) {
+    alerts.push({ label: days + 'd', severity: 'critical' });
+  }
+
+  // 5. "60 Day" — within 60 days of lease end, no renewal or new lease
+  if (!isResolved && days > 30 && days <= 60) {
+    alerts.push({ label: '60 Day', severity: 'warning' });
+  }
+
+  return alerts;
+}
+
 // ─── Seed data (fallback when no Google Sheets connection) ──────────────────
 export const SEED_UNITS = seedUnits;

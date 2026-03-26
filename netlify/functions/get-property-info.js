@@ -15,8 +15,13 @@ import { google } from 'googleapis';
 const HEADER_TO_FIELD = {
   'Property':                   'address',
   'Door Codes':                 'door_code',
+  'Door Code':                  'door_code',
+  'Lock Box / Key #':           'lockbox_code',
   'Lock Box and Key Number':    'lockbox_code',
+  'Lockbox Code':               'lockbox_code',
+  'Water Heater Location':      'water_heater_location',
   'Hot water heater':           'water_heater_location',
+  'Notes':                      'notes',
   'notes':                      'notes',
   'Filter #1':                  'filter_size',
   'Filter #2':                  'filter_size_2',
