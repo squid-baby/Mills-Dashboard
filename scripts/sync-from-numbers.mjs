@@ -8,8 +8,9 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { readFileSync } from 'fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
+import { execSync } from 'child_process';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -89,9 +90,46 @@ function parseDate(val) {
   return `${year}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
 
+// ─── Export from Numbers via numbers-parser (Python) ─────────────────────────
+const NUMBERS_FILE = '/Volumes/One Touch/The_Team_Google_Drive Sync/2025-2026 Renewals_Dashboard.numbers';
+const EXPORT_DIR = '/tmp/mills_export';
+
+function exportFromNumbers() {
+  console.log('Reading Numbers file directly...');
+  mkdirSync(EXPORT_DIR, { recursive: true });
+
+  const pyScript = `
+import numbers_parser, csv, os, sys
+
+doc = numbers_parser.Document("${NUMBERS_FILE}")
+for sheet in doc.sheets:
+    name = sheet.name
+    rows = sheet.tables[0].rows(values_only=True)
+    rows = [['' if v is None else str(v) for v in row] for row in rows]
+    fname = os.path.join("${EXPORT_DIR}", name + ".csv")
+    with open(fname, "w", newline="", encoding="utf-8") as f:
+        csv.writer(f).writerows(rows)
+    print(f"  Wrote {len(rows)} rows -> {fname}")
+`;
+
+  try {
+    const out = execSync(`python3 -c '${pyScript.replace(/'/g, "'\\''")}'`, {
+      timeout: 30000,
+      encoding: 'utf8',
+    });
+    process.stdout.write(out);
+    console.log('  ✓ Export complete');
+  } catch (err) {
+    console.error('  ✗ numbers-parser export failed:', err.stderr || err.message);
+    console.error('  Falling back to existing CSVs in', EXPORT_DIR);
+  }
+}
+
+exportFromNumbers();
+
 // ─── Main ────────────────────────────────────────────────────────────────────
-const sheet1Path = process.argv[2] || '/tmp/mills_export/2025-26 renewals-2019-20 Tenants.csv';
-const sheet2Path = process.argv[3] || '/tmp/mills_export/property info-Property Information.csv';
+const sheet1Path = process.argv[2] || `${EXPORT_DIR}/2025-26 renewals.csv`;
+const sheet2Path = process.argv[3] || `${EXPORT_DIR}/property info.csv`;
 
 console.log('Reading CSVs...');
 const sheet1Csv = readFileSync(resolve(sheet1Path), 'utf8');
