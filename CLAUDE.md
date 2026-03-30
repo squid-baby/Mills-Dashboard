@@ -11,16 +11,16 @@
 - **Property Info History**: Stored in "Property Info History" tab. Appended on every property field edit.
 
 ### Supabase Schema
-- `units` — one row per property (address, beds, baths, area, owner, utilities, etc.)
-- `residents` — one row per current resident (name, email, phone, status, lease_end, move_out_date, lease_signed, deposit_paid)
+- `units` — one row per property (address, beds, baths, area, owner_name, utilities, property_type, sq_ft, freeze_warning, pets_allowed, year_built)
+- `residents` — one row per current resident (name, email, phone, status, lease_end, move_out_date, lease_signed, deposit_paid, notes)
 - `next_residents` — one row per future resident (name, email, phone, move_in_date)
-- `unit_full` — **view** that joins units + residents + next_residents into nested JSON. This is what `get-units.js` fetches.
+- `unit_full` — view joining units + residents + next_residents (used for reference; `get-units.js` queries tables directly to get all fields)
 - `notes`, `pending_changes`, `sync_log` — supporting tables
 
 ### Netlify Functions
 | Function | Method | Purpose |
 |----------|--------|---------|
-| `get-units` | GET | Fetches all units from Supabase `unit_full` view, derives status groups |
+| `get-units` | GET | Queries Supabase `units` with embedded `residents` + `next_residents`, derives status groups |
 | `get-property-info` | GET | Fetches editable property fields from Google Sheet |
 | `update-property-info` | POST | Updates a property field in Google Sheet + appends history |
 | `save-inspection` | POST | Saves/updates turnover inspection to Google Sheet |
