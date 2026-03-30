@@ -84,6 +84,10 @@ function yn(val) {
 function parseDate(val) {
   const s = clean(val);
   if (!s) return null;
+  // ISO from numbers-parser: "2026-07-31 00:00:00" or "2026-07-31"
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  // M/D/YY from manual CSV export
   const [m, d, y] = s.split('/').map(Number);
   if (!m || !d || !y) return null;
   const year = y < 100 ? 2000 + y : y;
