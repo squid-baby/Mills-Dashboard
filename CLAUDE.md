@@ -12,12 +12,22 @@
 
 ### Sync Pipeline
 ```
-Amanda edits .numbers file (on Google Drive)
-  → Google Drive syncs to /Volumes/One Touch/...
-  → Scheduled task runs: node scripts/sync-from-numbers.mjs
-      → numbers-parser reads .numbers file directly → exports CSVs to /tmp/mills_export/
-      → Script upserts units, residents, next_residents into Supabase
+Tenant domain (read-only):
+  Amanda edits .numbers file (on Google Drive)
+    → Google Drive syncs to /Volumes/One Touch/...
+    → Scheduled task: node scripts/sync-from-numbers.mjs
+        → numbers-parser reads Sheet 1 only → exports 2025-26 renewals.csv
+        → Upserts units (address/owner/area only), residents, next_residents into Supabase
+
+Property domain (read-write):
+  Google Sheet edited by team / seeded by seed-units-from-csv.mjs
+    → Scheduled task: node scripts/sync-property-cache.mjs
+        → Reads "property info" Google Sheet tab
+        → Upserts property attributes (beds, baths, ac_type, etc.) into Supabase units
+
   → Dashboard calls /api/get-units → Netlify function queries Supabase → renders data
+  → Property Info tab calls /api/get-property-info → reads Google Sheet → renders fields
+  → Edits call /api/update-property-info → writes to Google Sheet → sync-property-cache picks up
 ```
 
 **Key gotcha (fixed March 2026):** The sync script used to read stale CSVs from `/tmp/mills_export/` that were only updated when manually exported from the Numbers app. Now it re-exports fresh CSVs from the `.numbers` file on every run using `numbers-parser`. If data looks stale, check that `/Volumes/One Touch/` is mounted and run the sync manually.
@@ -87,8 +97,10 @@ Cleaned headers (Title Case). Notable columns:
 ### Scripts
 | Script | Purpose | Run |
 |--------|---------|-----|
-| `sync-from-numbers.mjs` | Reads Amanda's Numbers file → upserts Supabase (tenant domain) | Scheduled + manual |
-| `migrate-sheet2-to-gsheet.mjs` | **One-time migration** — copies property attributes from Numbers Sheet 2 into the Property Info Google Sheet. Supports `--dry-run`. | Manual only |
+| `sync-from-numbers.mjs` | Reads Numbers Sheet 1 → upserts Supabase (tenant domain: residents, next_residents, address/owner/area) | Scheduled + manual |
+| `sync-property-cache.mjs` | Reads Property Info Google Sheet → upserts Supabase units (property attributes) | Scheduled + manual |
+| `seed-units-from-csv.mjs` | One-time seed from `Mills_Dashboard_Property_info_sheet.csv` → Supabase units | Manual only |
+| `migrate-sheet2-to-gsheet.mjs` | One-time migration — Numbers Sheet 2 → Google Sheet (run once to populate new columns) | Manual only |
 
 ## Key Decisions (March 2026)
 
@@ -132,7 +144,7 @@ Cleaned headers (Title Case). Notable columns:
 
 **Phone numbers / new columns not appearing** — Verify the Numbers file column indices match `scripts/sync-from-numbers.mjs` `S1`/`S2` constants. Print headers with: `python3 -c "import numbers_parser; doc = numbers_parser.Document('...'); [print(i, c.value) for i, c in enumerate(doc.sheets[0].tables[0].rows()[0])]"`
 
-**Property Info fields missing (beds, baths, town, etc.)** — The migration script may not have run yet, or a new property was added after migration. Run: `node --env-file=.env scripts/migrate-sheet2-to-gsheet.mjs --dry-run` to preview, then without `--dry-run` to execute. The script skips properties not already in the Google Sheet.
+**Property Info fields missing (beds, baths, town, etc.)** — Run `sync-property-cache.mjs` to pull latest from Google Sheet → Supabase: `node --env-file=.env scripts/sync-property-cache.mjs`. Or re-seed from CSV: `node --env-file=.env scripts/seed-units-from-csv.mjs`.
 
 **Adding a new property info field** — Add entries to both `HEADER_TO_FIELD` and `FIELD_TO_HEADER` in `src/config/columns.js`. If it's a new Google Sheet column, add the header name to `NEW_SHEET_COLUMNS` in the same file and re-run the migration script.
 

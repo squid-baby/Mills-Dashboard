@@ -8,7 +8,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { readFileSync, mkdirSync, writeFileSync } from 'fs';
+import { readFileSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
 import { execSync } from 'child_process';
 
@@ -40,17 +40,8 @@ const S1 = {
   AREA:         18, // was 17
 };
 
-const S2 = {
-  PROPERTY:      0,
-  BEDS:          1,
-  BATHS:         2,
-  UTILITIES:     10,
-  PROPERTY_TYPE: 7,
-  SQ_FT:         8,
-  FREEZE_WARNING:11,
-  PETS:          18,
-  AREA:          24,
-};
+// S2 (Sheet 2 / property info) removed — property attributes now owned by
+// the Property Info Google Sheet and synced to Supabase via sync-property-cache.mjs.
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function parseCSV(text) {
@@ -103,17 +94,16 @@ function exportFromNumbers() {
   mkdirSync(EXPORT_DIR, { recursive: true });
 
   const pyScript = `
-import numbers_parser, csv, os, sys
+import numbers_parser, csv, os
 
 doc = numbers_parser.Document("${NUMBERS_FILE}")
-for sheet in doc.sheets:
-    name = sheet.name
-    rows = sheet.tables[0].rows(values_only=True)
-    rows = [['' if v is None else str(v) for v in row] for row in rows]
-    fname = os.path.join("${EXPORT_DIR}", name + ".csv")
-    with open(fname, "w", newline="", encoding="utf-8") as f:
-        csv.writer(f).writerows(rows)
-    print(f"  Wrote {len(rows)} rows -> {fname}")
+sheet = doc.sheets[0]  # Sheet 1 only — renewals/tenant data
+rows = sheet.tables[0].rows(values_only=True)
+rows = [['' if v is None else str(v) for v in row] for row in rows]
+fname = os.path.join("${EXPORT_DIR}", "2025-26 renewals.csv")
+with open(fname, "w", newline="", encoding="utf-8") as f:
+    csv.writer(f).writerows(rows)
+print(f"  Wrote {len(rows)} rows -> {fname}")
 `;
 
   try {
@@ -133,37 +123,13 @@ exportFromNumbers();
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 const sheet1Path = process.argv[2] || `${EXPORT_DIR}/2025-26 renewals.csv`;
-const sheet2Path = process.argv[3] || `${EXPORT_DIR}/property info.csv`;
 
-console.log('Reading CSVs...');
+console.log('Reading CSV...');
 const sheet1Csv = readFileSync(resolve(sheet1Path), 'utf8');
-const sheet2Csv = readFileSync(resolve(sheet2Path), 'utf8');
-
 const sheet1Rows = parseCSV(sheet1Csv);
-const sheet2Rows = parseCSV(sheet2Csv);
 console.log(`  Sheet1: ${sheet1Rows.length - 1} data rows`);
-console.log(`  Sheet2: ${sheet2Rows.length - 1} data rows`);
 
 const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
-// Build property info lookup from Sheet2
-const propInfo = {};
-for (let i = 1; i < sheet2Rows.length; i++) {
-  const row = sheet2Rows[i];
-  const addr = clean(row[S2.PROPERTY]);
-  if (!addr) continue;
-  propInfo[addr] = {
-    address: addr,
-    beds: clean(row[S2.BEDS]) || null,
-    baths: parseFloat(row[S2.BATHS]) || null,
-    utilities: clean(row[S2.UTILITIES]),
-    property_type: clean(row[S2.PROPERTY_TYPE]),
-    sq_ft: parseInt(row[S2.SQ_FT], 10) || null,
-    freeze_warning: yn(row[S2.FREEZE_WARNING]),
-    pets_allowed: clean(row[S2.PETS]),
-    area: clean(row[S2.AREA]),
-  };
-}
 
 // Group Sheet1 rows by address
 const groups = new Map();
@@ -176,43 +142,16 @@ for (let i = 1; i < sheet1Rows.length; i++) {
   groups.get(addr).push(row);
 }
 
-console.log(`\nFound ${groups.size} units in Sheet1, ${Object.keys(propInfo).length} in Sheet2`);
+console.log(`\nFound ${groups.size} units in Sheet1`);
 
-// Build unit rows
+// Upsert units — only address, owner, area from Sheet1.
+// All other property attributes (beds, baths, ac_type, etc.) are managed by
+// sync-property-cache.mjs and not touched here.
 const unitRows = [];
 for (const [address, rows] of groups) {
-  const info = propInfo[address] || {};
   const owner = rows.map(r => clean(r[S1.OWNER])).find(v => v) || '';
-  const area = rows.map(r => clean(r[S1.AREA])).find(v => v) || info.area || '';
-  unitRows.push({
-    address,
-    beds: info.beds ?? null,
-    baths: info.baths ?? null,
-    area,
-    owner_name: owner,
-    utilities: info.utilities || '',
-    property_type: info.property_type || '',
-    sq_ft: info.sq_ft ?? null,
-    freeze_warning: info.freeze_warning ?? false,
-    pets_allowed: info.pets_allowed || '',
-  });
-}
-// Also add units that are only in Sheet2
-for (const [addr, info] of Object.entries(propInfo)) {
-  if (!groups.has(addr)) {
-    unitRows.push({
-      address: addr,
-      beds: info.beds ?? null,
-      baths: info.baths ?? null,
-      area: info.area || '',
-      owner_name: '',
-      utilities: info.utilities || '',
-      property_type: info.property_type || '',
-      sq_ft: info.sq_ft ?? null,
-      freeze_warning: info.freeze_warning ?? false,
-      pets_allowed: info.pets_allowed || '',
-    });
-  }
+  const area  = rows.map(r => clean(r[S1.AREA])).find(v => v) || '';
+  unitRows.push({ address, owner_name: owner, area });
 }
 
 console.log(`\nUpserting ${unitRows.length} units...`);

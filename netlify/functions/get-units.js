@@ -31,6 +31,8 @@ export async function handler() {
       .select(`
         id, address, beds, baths, area, owner_name, utilities,
         property_type, sq_ft, freeze_warning, pets_allowed, year_built,
+        town, washer, dryer, dishwasher, gas, sump_pump, breaker_box,
+        ac_type, heat_type, sheet_notes,
         residents ( name, email, phone, status, lease_end, move_out_date, lease_signed, deposit_paid, notes ),
         next_residents ( name, email, phone, move_in_date )
       `)
@@ -110,9 +112,20 @@ function buildUnit(row, id) {
     propertyInfo: {
       propertyType:  row.property_type || '',
       sqft:          row.sq_ft || '',
-      freezeWarning: !!row.freeze_warning,
-      petsAllowed:   row.pets_allowed || '',
       yearBuilt:     row.year_built || '',
+      town:          row.town || '',
+      // These are also exposed via get-property-info (source: gsheet) but
+      // kept here so Tile / other components can read them without an extra fetch.
+      washer:        !!row.washer,
+      dryer:         !!row.dryer,
+      dishwasher:    !!row.dishwasher,
+      gas:           !!row.gas,
+      freeze_warning: !!row.freeze_warning,
+      sump_pump:     !!row.sump_pump,
+      breaker_box:   row.breaker_box || '',
+      ac_type:       row.ac_type || '',
+      heat_type:     row.heat_type || '',
+      pets_allowed:  row.pets_allowed || '',
     },
   };
 }
