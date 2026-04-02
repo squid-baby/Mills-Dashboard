@@ -12,38 +12,7 @@
  */
 
 import { google } from 'googleapis';
-
-// Maps field keys → sheet column headers (reverse of HEADER_TO_FIELD in get-property-info.js)
-const FIELD_TO_HEADER = {
-  'address':                  'Property',
-  'door_code':                'Door Code',
-  'lockbox_code':             'Lockbox Code',
-  'water_heater_location':    'Water Heater Location',
-  'notes':                    'Notes',
-  'filter_size':              'Filter #1',
-  'filter_size_2':            'Filter #2',
-  'alarm_code':               'Alarm Code',
-  'key_location':             'Key Location',
-  'water_shutoff':            'Water Shutoff',
-  'internet_provider':        'Internet Provider',
-  'water_heater_type':        'Water Heater Type',
-  'water_heater_last_service':'Water Heater Last Service',
-  'hvac_last_service':        'HVAC Last Service',
-  'washer_replaced':          'Washer Replaced',
-  'washer_warranty':          'Washer Warranty',
-  'dryer_replaced':           'Dryer Replaced',
-  'dryer_warranty':           'Dryer Warranty',
-  'dishwasher_replaced':      'Dishwasher Replaced',
-  'dishwasher_warranty':      'Dishwasher Warranty',
-  'fridge_replaced':          'Fridge Replaced',
-  'fridge_warranty':          'Fridge Warranty',
-  'toilet_flapper_style':     'Toilet Flapper Style',
-  'toilet_seat_style':        'Toilet Seat Style',
-  'paint_interior':           'Paint Interior',
-  'paint_trim':               'Paint Trim',
-  'paint_brand':              'Paint Brand',
-  'paint_last_done':          'Paint Last Done',
-};
+import { FIELD_TO_HEADER } from '../../src/config/columns.js';
 
 const SENSITIVE_FIELDS = ['door_code', 'alarm_code'];
 
@@ -148,12 +117,12 @@ export async function handler(event) {
       });
     } catch { /* history tab doesn't exist yet — that's ok */ }
 
+    console.log(`[update-property-info] OK — "${address}" | ${field}: "${oldValue || ''}" → "${value || ''}" | by: ${by || 'Dashboard'} | ${Date.now() - t0}ms`);
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ success: true, notify: SENSITIVE_FIELDS.includes(field) }),
     };
-    console.log(`[update-property-info] OK — "${address}" | ${field}: "${oldValue || ''}" → "${value || ''}" | by: ${by || 'Dashboard'} | ${Date.now() - t0}ms`);
   } catch (err) {
     console.error(`[update-property-info] ERROR — "${address}" | ${field} after ${Date.now() - t0}ms:`, err.message);
     return {

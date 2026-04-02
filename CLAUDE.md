@@ -25,11 +25,15 @@ Amanda edits .numbers file (on Google Drive)
 **Key gotcha (fixed March 2026):** `get-units.js` was originally reading from Google Sheets, not Supabase. It now queries Supabase directly. If the dashboard shows "Local data" instead of "Synced", the Netlify function is failing — check Netlify function logs.
 
 ### Supabase Schema
-- `units` — one row per property (address, beds, baths, area, owner_name, utilities, property_type, sq_ft, freeze_warning, pets_allowed, year_built)
+- `units` — one row per property (address, beds, baths, area, owner_name, utilities, property_type, sq_ft, freeze_warning, pets_allowed, year_built, town, washer, dryer, dishwasher, gas, sump_pump, breaker_box, ac_type, heat_type, sheet_notes)
 - `residents` — one row per current resident (name, email, phone, status, lease_end, move_out_date, lease_signed, deposit_paid, notes)
 - `next_residents` — one row per future resident (name, email, phone, move_in_date)
 - `unit_full` — view joining units + residents + next_residents (reference only; `get-units.js` queries tables directly to get all fields including phone and move_out_date)
-- `notes`, `pending_changes`, `sync_log` — supporting tables
+- `notes` — per-unit notes (id, unit_id, text, created_by, created_at)
+- `inspections` — per-unit inspection records (id, unit_id, inspector, inspection_date, overall_condition, overall_notes, items_json, created_at, updated_at)
+- `pending_changes`, `sync_log` — supporting tables
+
+**Phase 2 SQL (already run):** Added 11 new columns to `units` + created `notes` and `inspections` tables. If setting up fresh, run the SQL block from the Phase 2 migration handoff.
 
 ### Numbers File Sheet Names (as exported to CSV)
 - `2025-26 renewals.csv` → Sheet1 (tenant/renewal data)
@@ -60,11 +64,17 @@ Amanda edits .numbers file (on Google Drive)
 | Function | Method | Purpose |
 |----------|--------|---------|
 | `get-units` | GET | Queries Supabase `units` with embedded `residents` + `next_residents`, derives status groups |
-| `get-property-info` | GET | Fetches editable property fields from Google Sheet |
+| `get-property-info` | GET | Fetches property fields from Google Sheet (all fields in `src/config/columns.js`) |
 | `update-property-info` | POST | Updates a property field in Google Sheet + appends history |
 | `save-inspection` | POST | Saves/updates turnover inspection to Google Sheet |
 | `get-inspection` | GET | Fetches a single inspection by address |
 | `get-all-inspections` | GET | Fetches all inspection summaries (address + overallCondition) |
+
+### Column Config (`src/config/columns.js`)
+Single source of truth for the Google Sheet ↔ field key mapping. Both `get-property-info.js` and `update-property-info.js` import from here — **add new fields here only**.
+- `HEADER_TO_FIELD` — sheet header → field key (53 entries; supports aliases for legacy column names)
+- `FIELD_TO_HEADER` — field key → canonical sheet header (48 entries; used for writes)
+- `NEW_SHEET_COLUMNS` — 7 columns appended by the migration script (Year Built, Sump Pump, Breaker Box, AC Type, Heat Type, Pets Allowed, Sheet Notes)
 
 ### Property Info Sheet (Google Sheet) Columns
 Cleaned headers (Title Case). Notable columns:
@@ -72,6 +82,13 @@ Cleaned headers (Title Case). Notable columns:
 - G: Town, H: Property Type, I: Sq Ft, J: Gas, K: Included Utilities
 - L: Freeze Warning, V: Owner, X: Area
 - AF-BA: Dashboard-managed fields (Door Code, Lockbox Code, appliance dates, paint, etc.)
+- End of sheet: Year Built, Sump Pump, Breaker Box, AC Type, Heat Type, Pets Allowed, Sheet Notes (appended by `migrate-sheet2-to-gsheet.mjs`)
+
+### Scripts
+| Script | Purpose | Run |
+|--------|---------|-----|
+| `sync-from-numbers.mjs` | Reads Amanda's Numbers file → upserts Supabase (tenant domain) | Scheduled + manual |
+| `migrate-sheet2-to-gsheet.mjs` | **One-time migration** — copies property attributes from Numbers Sheet 2 into the Property Info Google Sheet. Supports `--dry-run`. | Manual only |
 
 ## Key Decisions (March 2026)
 
@@ -114,6 +131,10 @@ Cleaned headers (Title Case). Notable columns:
 3. Check scheduled task is active in Claude Code.
 
 **Phone numbers / new columns not appearing** — Verify the Numbers file column indices match `scripts/sync-from-numbers.mjs` `S1`/`S2` constants. Print headers with: `python3 -c "import numbers_parser; doc = numbers_parser.Document('...'); [print(i, c.value) for i, c in enumerate(doc.sheets[0].tables[0].rows()[0])]"`
+
+**Property Info fields missing (beds, baths, town, etc.)** — The migration script may not have run yet, or a new property was added after migration. Run: `node --env-file=.env scripts/migrate-sheet2-to-gsheet.mjs --dry-run` to preview, then without `--dry-run` to execute. The script skips properties not already in the Google Sheet.
+
+**Adding a new property info field** — Add entries to both `HEADER_TO_FIELD` and `FIELD_TO_HEADER` in `src/config/columns.js`. If it's a new Google Sheet column, add the header name to `NEW_SHEET_COLUMNS` in the same file and re-run the migration script.
 
 ## Dev Setup
 ```bash

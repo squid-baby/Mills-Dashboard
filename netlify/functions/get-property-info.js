@@ -10,43 +10,7 @@
  */
 
 import { google } from 'googleapis';
-
-// Maps sheet column headers → field keys used in the dashboard
-const HEADER_TO_FIELD = {
-  'Property':                   'address',
-  'Door Codes':                 'door_code',
-  'Door Code':                  'door_code',
-  'Lock Box / Key #':           'lockbox_code',
-  'Lock Box and Key Number':    'lockbox_code',
-  'Lockbox Code':               'lockbox_code',
-  'Water Heater Location':      'water_heater_location',
-  'Hot water heater':           'water_heater_location',
-  'Notes':                      'notes',
-  'notes':                      'notes',
-  'Filter #1':                  'filter_size',
-  'Filter #2':                  'filter_size_2',
-  'Alarm Code':                 'alarm_code',
-  'Key Location':               'key_location',
-  'Water Shutoff':              'water_shutoff',
-  'Internet Provider':          'internet_provider',
-  'Water Heater Type':          'water_heater_type',
-  'Water Heater Last Service':  'water_heater_last_service',
-  'HVAC Last Service':          'hvac_last_service',
-  'Washer Replaced':            'washer_replaced',
-  'Washer Warranty':            'washer_warranty',
-  'Dryer Replaced':             'dryer_replaced',
-  'Dryer Warranty':             'dryer_warranty',
-  'Dishwasher Replaced':        'dishwasher_replaced',
-  'Dishwasher Warranty':        'dishwasher_warranty',
-  'Fridge Replaced':            'fridge_replaced',
-  'Fridge Warranty':            'fridge_warranty',
-  'Toilet Flapper Style':       'toilet_flapper_style',
-  'Toilet Seat Style':          'toilet_seat_style',
-  'Paint Interior':             'paint_interior',
-  'Paint Trim':                 'paint_trim',
-  'Paint Brand':                'paint_brand',
-  'Paint Last Done':            'paint_last_done',
-};
+import { HEADER_TO_FIELD } from '../../src/config/columns.js';
 
 export async function handler(event) {
   const address = event.queryStringParameters?.address;
