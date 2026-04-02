@@ -6,6 +6,12 @@
 [build.environment]
   NODE_VERSION = "20"
 
+[dev]
+  command = "npm run dev"
+  targetPort = 5173
+  port = 8888
+  publish = "dist"
+
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["googleapis"]
