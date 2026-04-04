@@ -67,6 +67,8 @@ export const PROPERTY_INFO_FIELDS = [
       { key: 'dryer',                label: 'Dryer',                source: 'gsheet' },
       { key: 'dishwasher',           label: 'Dishwasher',           source: 'gsheet' },
       { key: 'stove',                label: 'Stove',                source: 'gsheet' },
+      { key: 'stove_replaced',       label: 'Stove replaced',       source: 'gsheet', type: 'date' },
+      { key: 'stove_warranty',       label: 'Stove warranty',       source: 'gsheet', options: ['3yr', '5yr', 'none'] },
       { key: 'washer_replaced',      label: 'Washer replaced',      source: 'gsheet', type: 'date' },
       { key: 'washer_warranty',      label: 'Washer warranty',      source: 'gsheet', options: ['3yr', '5yr', 'none'] },
       { key: 'dryer_replaced',       label: 'Dryer replaced',       source: 'gsheet', type: 'date' },

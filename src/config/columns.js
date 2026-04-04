@@ -39,6 +39,8 @@ export const HEADER_TO_FIELD = {
   'Dryer':                      'dryer',
   'Dishwasher':                 'dishwasher',
   'Stove':                      'stove',
+  'Stove Replaced':             'stove_replaced',
+  'Stove Warranty':             'stove_warranty',
 
   // Appliance service records
   'Washer Replaced':            'washer_replaced',
@@ -113,6 +115,8 @@ export const FIELD_TO_HEADER = {
   'dryer':                      'Dryer',
   'dishwasher':                 'Dishwasher',
   'stove':                      'Stove',
+  'stove_replaced':             'Stove Replaced',
+  'stove_warranty':             'Stove Warranty',
 
   // Appliance service records
   'washer_replaced':            'Washer Replaced',
