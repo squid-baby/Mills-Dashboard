@@ -282,4 +282,4 @@ ALTER TABLE next_residents ADD COLUMN IF NOT EXISTS move_in_date date;
   console.log('  ✓ next_residents done');
 }
 
-console.log(`\n✓ Sync complete — ${unitRows.length} units, ${residentRows.length} residents, ${nextResidentRows.length} next residents`);
+console.log(`\n✓ Sync complete — ${resolvedIds.size} units matched, ${residentRows.length} residents, ${nextResidentRows.length} next residents`);
