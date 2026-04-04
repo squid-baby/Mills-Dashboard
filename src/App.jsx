@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { GC, PRIO, SORT_OPTS, SEED_UNITS, parseDate, fmtMonth, daysUntil } from './data/units';
 import StatusBadge from './components/StatusBadge';
 import Tile from './components/Tile';
@@ -8,7 +8,7 @@ import GroupHeader from './components/GroupHeader';
 
 const POLL_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
-function exportTurnoverData(units, inspectionConditions) {
+async function exportTurnoverData(units, inspectionConditions) {
   // Filter to units with a future move-in date
   const now = new Date();
   const turnoverUnits = units.filter(u => {
@@ -23,6 +23,16 @@ function exportTurnoverData(units, inspectionConditions) {
     return;
   }
 
+  // Fetch dashboard notes for all turnover units in parallel
+  const notesPerUnit = await Promise.all(
+    turnoverUnits.map(u =>
+      fetch(`/api/get-notes?unit_id=${u.id}`)
+        .then(r => r.json())
+        .then(data => data.notes || [])
+        .catch(() => [])
+    )
+  );
+
   const conditionLabel = (c) =>
     c === 'up_to_date' ? 'Up to date' :
     c === 'needs_love' ? 'Needs love' :
@@ -33,8 +43,8 @@ function exportTurnoverData(units, inspectionConditions) {
     return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
 
-  const headers = ['Address', 'Beds', 'Lease End', 'Move Out', 'Move In', 'Turn Window (days)', 'Current Tenants', 'Next Tenants', 'Overall Condition', 'Turnover Notes'];
-  const rows = turnoverUnits.map(u => {
+  const headers = ['Address', 'Beds', 'Lease End', 'Move Out', 'Move In', 'Turn Window (days)', 'Current Tenants', 'Next Tenants', 'Overall Condition', 'Turnover Notes', 'Dashboard Notes'];
+  const rows = turnoverUnits.map((u, idx) => {
     let windowDays = '';
     if (u.moveOutDate && u.moveInDate) {
       const pOut = u.moveOutDate.split('/').map(Number);
@@ -43,6 +53,7 @@ function exportTurnoverData(units, inspectionConditions) {
       const inn = new Date(2000 + (pIn[2] < 100 ? pIn[2] : pIn[2] - 2000), pIn[0] - 1, pIn[1]);
       windowDays = Math.ceil((inn - out) / 864e5);
     }
+    const dashboardNotes = notesPerUnit[idx].map(n => n.text).join('; ');
     return [
       u.address,
       u.beds,
@@ -54,6 +65,7 @@ function exportTurnoverData(units, inspectionConditions) {
       u.nextResidents.map(r => r.name).join('; '),
       conditionLabel(inspectionConditions[u.address] || ''),
       u.turnoverNotes,
+      dashboardNotes,
     ].map(escCSV).join(',');
   });
 
@@ -79,15 +91,8 @@ export default function App() {
   const [filterArea, setFilterArea] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [searchText, setSearchText] = useState('');
-  const [userNotes, setUserNotes] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('mills_notes') || '{}'); } catch { return {}; }
-  });
+  const [exporting, setExporting] = useState(false);
   const [inspectionConditions, setInspectionConditions] = useState({});
-
-  // Persist notes to localStorage
-  useEffect(() => {
-    try { localStorage.setItem('mills_notes', JSON.stringify(userNotes)); } catch { /* ignore */ }
-  }, [userNotes]);
 
   // Poll Google Sheets via Netlify Function
   useEffect(() => {
@@ -120,14 +125,13 @@ export default function App() {
       .catch(() => { /* ignore */ });
   }, [units]); // re-fetch when units refresh
 
-  // Enrich units with user notes and inspection conditions
+  // Enrich units with inspection conditions
   const enriched = useMemo(() =>
     units.map(u => ({
       ...u,
-      _userNotes: userNotes[u.id] || [],
       _inspectionCondition: inspectionConditions[u.address] || null,
     })),
-    [units, userNotes, inspectionConditions]
+    [units, inspectionConditions]
   );
 
   // Filter
@@ -182,9 +186,6 @@ export default function App() {
     [units]
   );
 
-  const handleAddNote = useCallback((unitId, notes) => {
-    setUserNotes(prev => ({ ...prev, [unitId]: notes }));
-  }, []);
 
   // Time since last sync
   const syncAgo = lastSynced
@@ -212,7 +213,7 @@ export default function App() {
 
       {/* Detail panel */}
       {selectedUnit && (
-        <DetailPanel unit={selectedUnit} onClose={() => setSelectedId(null)} onAddNote={handleAddNote} />
+        <DetailPanel unit={selectedUnit} onClose={() => setSelectedId(null)} />
       )}
 
       {/* Header */}
@@ -399,7 +400,12 @@ export default function App() {
           <div style={{ flex: 1 }} />
 
           <button
-            onClick={() => exportTurnoverData(enriched, inspectionConditions)}
+            disabled={exporting}
+            onClick={async () => {
+              setExporting(true);
+              try { await exportTurnoverData(filtered, inspectionConditions); }
+              finally { setExporting(false); }
+            }}
             style={{
               background: 'var(--bg-elevated)',
               color: 'var(--text-muted)',
@@ -407,12 +413,13 @@ export default function App() {
               borderRadius: 'var(--radius-sm)',
               padding: '5px 10px',
               fontSize: 11, fontWeight: 600,
-              cursor: 'pointer',
+              cursor: exporting ? 'wait' : 'pointer',
+              opacity: exporting ? 0.5 : 1,
               transition: 'all var(--duration-fast) ease',
               whiteSpace: 'nowrap',
             }}
           >
-            Export Turnovers
+            {exporting ? 'Exporting...' : 'Export Turnovers'}
           </button>
 
           <span style={{

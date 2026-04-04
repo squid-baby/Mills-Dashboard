@@ -88,6 +88,8 @@ Until fixed, those properties will have orphan unit rows in Supabase with no pro
 | `save-inspection` | POST | Saves/updates turnover inspection to Google Sheet |
 | `get-inspection` | GET | Fetches a single inspection by address |
 | `get-all-inspections` | GET | Fetches all inspection summaries (address + overallCondition) |
+| `get-notes` | GET | Fetches all notes for a unit from Supabase `notes` table (by `unit_id`) |
+| `save-note` | POST | Inserts a note into Supabase `notes` table (`unit_id`, `text`, `created_by`) |
 
 ### Column Config (`src/config/columns.js`)
 Single source of truth for the Google Sheet ↔ field key mapping. Both `get-property-info.js` and `update-property-info.js` import from here — **add new fields here only**.
@@ -117,6 +119,13 @@ Column positions may shift as the team rearranges the sheet — always rely on h
 | `migrate-sheet2-to-gsheet.mjs` | One-time migration — Numbers Sheet 2 → Google Sheet (run once to populate new columns) | Manual only |
 
 ## Key Decisions (April 2026)
+
+### Notes Migrated to Supabase
+- Notes were previously stored in browser `localStorage` (key `mills_notes`). Now stored in Supabase `notes` table, shared across users/devices.
+- `DetailPanel.jsx` fetches notes via `/api/get-notes` on mount and saves via `/api/save-note` (POST). No more `onAddNote` prop or `_userNotes` enrichment in `App.jsx`.
+- CSV export ("Export Turnovers") fetches dashboard notes from Supabase and includes them in a separate "Dashboard Notes" column alongside the existing "Turnover Notes" (from Amanda's spreadsheet).
+- Export now respects the current filtered view — if you filter to one property, only that property exports.
+- `created_by` defaults to `'Team'` for all notes (no per-user auth yet).
 
 ### Appliance Fields
 - Stove, Stove Replaced, Stove Warranty added to match the pattern of washer/dryer/dishwasher/fridge.
@@ -158,7 +167,7 @@ Column positions may shift as the team rearranges the sheet — always rely on h
 - Full inspection form: replacement items, paint, 50+ condition assessment items, overall rating.
 - Data saved to Google Sheet as JSON blob per inspection.
 - Overall condition (Up to date / Needs love / At risk) shows as colored dot on tiles.
-- Export button in main header: "Export Turnovers" — filters to future move-in dates.
+- Export button in main header: "Export Turnovers" — exports current filtered view (only future move-in dates). Includes both "Turnover Notes" (spreadsheet) and "Dashboard Notes" (Supabase). Shows "Exporting..." while fetching notes.
 
 ## Troubleshooting
 

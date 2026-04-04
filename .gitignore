@@ -2,6 +2,11 @@ node_modules/
 dist/
 .env
 .DS_Store
+._*
 *.local
 .netlify/
 .claude/worktrees/
+*.numbers
+*_Sync_v4/
+*.csv
+*-plan.md

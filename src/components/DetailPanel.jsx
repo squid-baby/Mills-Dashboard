@@ -4,24 +4,39 @@ import StatusBadge from './StatusBadge';
 import PropertyInfoTab from './PropertyInfoTab';
 import TurnoverTab from './TurnoverTab';
 
-export default function DetailPanel({ unit, onClose, onAddNote }) {
+export default function DetailPanel({ unit, onClose }) {
   const [noteText, setNoteText] = useState('');
-  const [localNotes, setLocalNotes] = useState(unit._userNotes || []);
+  const [localNotes, setLocalNotes] = useState([]);
+  const [notesLoading, setNotesLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('tenant');
   const c = GC[unit.group] || GC.unknown;
 
   useEffect(() => {
-    setLocalNotes(unit._userNotes || []);
     setNoteText('');
     setActiveTab('tenant');
+    setNotesLoading(true);
+    fetch(`/api/get-notes?unit_id=${unit.id}`)
+      .then(r => r.json())
+      .then(data => setLocalNotes(data.notes || []))
+      .catch(() => setLocalNotes([]))
+      .finally(() => setNotesLoading(false));
   }, [unit.id]);
 
   function handleAdd() {
-    if (!noteText.trim()) return;
-    const n = { text: noteText.trim(), time: new Date().toLocaleString(), by: 'Andrea' };
-    const updated = [n, ...localNotes];
-    setLocalNotes(updated);
-    onAddNote(unit.id, updated);
+    if (!noteText.trim() || saving) return;
+    setSaving(true);
+    fetch('/api/save-note', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unit_id: unit.id, text: noteText.trim(), created_by: 'Team' }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.note) setLocalNotes(prev => [data.note, ...prev]);
+      })
+      .catch(() => { /* silent */ })
+      .finally(() => setSaving(false));
     setNoteText('');
   }
 
@@ -325,36 +340,48 @@ export default function DetailPanel({ unit, onClose, onAddNote }) {
                 />
                 <button
                   onClick={handleAdd}
+                  disabled={saving}
                   style={{
                     background: c.color,
                     border: 'none',
                     borderRadius: 'var(--radius-sm)',
                     padding: '0 16px',
                     color: '#000', fontWeight: 700, fontSize: 16,
-                    cursor: 'pointer',
+                    cursor: saving ? 'wait' : 'pointer',
+                    opacity: saving ? 0.5 : 1,
                     transition: 'opacity var(--duration-fast) ease',
                   }}
                 >
                   +
                 </button>
               </div>
-              {localNotes.map((n, i) => (
-                <div key={i} style={{
-                  padding: '8px 12px',
-                  background: 'var(--bg-elevated)',
-                  borderRadius: 'var(--radius-sm)',
-                  marginBottom: 6,
-                  borderLeft: `3px solid ${c.color}`,
-                  animation: i === 0 && localNotes.length > 1 ? 'slideUp 200ms var(--ease)' : 'none',
-                }}>
-                  <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.4 }}>{n.text}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>{n.by} / {n.time}</div>
-                </div>
-              ))}
-              {localNotes.length === 0 && (
+              {notesLoading ? (
                 <div style={{ fontSize: 13, color: 'var(--text-dim)', fontStyle: 'italic' }}>
-                  No notes yet.
+                  Loading notes...
                 </div>
+              ) : (
+                <>
+                  {localNotes.map((n, i) => (
+                    <div key={n.id || i} style={{
+                      padding: '8px 12px',
+                      background: 'var(--bg-elevated)',
+                      borderRadius: 'var(--radius-sm)',
+                      marginBottom: 6,
+                      borderLeft: `3px solid ${c.color}`,
+                      animation: i === 0 && localNotes.length > 1 ? 'slideUp 200ms var(--ease)' : 'none',
+                    }}>
+                      <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.4 }}>{n.text}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+                        {n.created_by} / {new Date(n.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                  {localNotes.length === 0 && (
+                    <div style={{ fontSize: 13, color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                      No notes yet.
+                    </div>
+                  )}
+                </>
               )}
             </Section>
           </div>
