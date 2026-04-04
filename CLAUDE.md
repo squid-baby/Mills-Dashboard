@@ -34,6 +34,15 @@ Property domain (read-write):
 
 **Key gotcha (fixed March 2026):** `get-units.js` was originally reading from Google Sheets, not Supabase. It now queries Supabase directly. If the dashboard shows "Local data" instead of "Synced", the Netlify function is failing — check Netlify function logs.
 
+**Key gotcha (fixed April 2026):** `sync-from-numbers.mjs` used to upsert new `units` rows directly from Amanda's Numbers file, causing duplicate tiles when addresses didn't match exactly between the two sources. It now fetches existing Supabase units first and only attaches residents to matched units — it never creates new unit rows. The Property Info Google Sheet is the authoritative source of what units exist. Address matching is case-insensitive and whitespace-normalized. Unmatched Numbers addresses are logged as warnings.
+
+**Pending address mismatches (April 2026):** These addresses in Amanda's Numbers file don't match the Property Info sheet and will log warnings on sync until fixed:
+- `"230–246 Valley Park"` → should be `"230–246 Valley Park Dr"`
+- `"301 A/B/C/D Pleasant St"` / `"301 Pleasant St House"` → should drop "St" (e.g. `"301 A Pleasant"`)
+- `"110 Fidelity"` → should be `"110 Fidelity St"`
+- `"207 Oak Ave"` → should be `"207 A Oak Ave"`
+Until fixed, those properties will have orphan unit rows in Supabase with no property info. Run `cleanup-duplicate-units.mjs` after fixing to remove them.
+
 ### Supabase Schema
 - `units` — one row per property (address, beds, baths, area, owner_name, utilities, property_type, sq_ft, freeze_warning, pets_allowed, year_built, town, washer, dryer, dishwasher, gas, sump_pump, breaker_box, ac_type, heat_type, sheet_notes)
 - `residents` — one row per current resident (name, email, phone, status, lease_end, move_out_date, lease_signed, deposit_paid, notes)
@@ -82,25 +91,43 @@ Property domain (read-write):
 
 ### Column Config (`src/config/columns.js`)
 Single source of truth for the Google Sheet ↔ field key mapping. Both `get-property-info.js` and `update-property-info.js` import from here — **add new fields here only**.
-- `HEADER_TO_FIELD` — sheet header → field key (53 entries; supports aliases for legacy column names)
-- `FIELD_TO_HEADER` — field key → canonical sheet header (48 entries; used for writes)
-- `NEW_SHEET_COLUMNS` — 7 columns appended by the migration script (Year Built, Sump Pump, Breaker Box, AC Type, Heat Type, Pets Allowed, Sheet Notes)
+- `HEADER_TO_FIELD` — sheet header → field key (supports aliases for legacy column names)
+- `FIELD_TO_HEADER` — field key → canonical sheet header (used for writes)
+- `NEW_SHEET_COLUMNS` — columns appended by the migration script
+
+**Column lookup is name-based, not positional.** Rearranging columns in the Google Sheet is safe — code finds columns by scanning the header row. Do not use column indices anywhere.
+
+**Legacy column U ("Door Codes"):** The original sheet had door codes at column U before the dashboard-managed fields were moved to AF ("Door Code"). Column U still has some legacy door code data for a handful of properties. The dashboard reads from AF (canonical). Do not delete or rename the U header.
 
 ### Property Info Sheet (Google Sheet) Columns
-Cleaned headers (Title Case). Notable columns:
-- A: Property, B: Bedrooms, C: Bathrooms, D-F: Washer/Dryer/Dishwasher
-- G: Town, H: Property Type, I: Sq Ft, J: Gas, K: Included Utilities
-- L: Freeze Warning, V: Owner, X: Area
-- AF-BA: Dashboard-managed fields (Door Code, Lockbox Code, appliance dates, paint, etc.)
-- End of sheet: Year Built, Sump Pump, Breaker Box, AC Type, Heat Type, Pets Allowed, Sheet Notes (appended by `migrate-sheet2-to-gsheet.mjs`)
+Column positions may shift as the team rearranges the sheet — always rely on header names, not column letters. Known notable columns (as of April 2026):
+- A: Property (address — must match Supabase `units.address` exactly for syncing)
+- Dashboard-managed fields: Door Code, Lockbox Code, appliance service records, paint info
+- BB: Stove, BC: Stove Replaced, BD: Stove Warranty (added April 2026)
+- Legacy column U: "Door Codes" — has some old data, do not remove
 
 ### Scripts
 | Script | Purpose | Run |
 |--------|---------|-----|
-| `sync-from-numbers.mjs` | Reads Numbers Sheet 1 → upserts Supabase (tenant domain: residents, next_residents, address/owner/area) | Scheduled + manual |
+| `sync-from-numbers.mjs` | Reads Numbers Sheet 1 → attaches residents/next_residents to existing Supabase units; updates owner/area. Never creates new unit rows. | Scheduled + manual |
 | `sync-property-cache.mjs` | Reads Property Info Google Sheet → upserts Supabase units (property attributes) | Scheduled + manual |
+| `cleanup-duplicate-units.mjs` | Finds Supabase unit rows whose address doesn't match any Property Info sheet address and deletes them. Dry-run by default; pass `--confirm` to delete. | Manual only (after fixing address mismatches) |
+| `add-missing-properties.mjs` | One-time script used April 2026 to add 5 Howell St #1–9 and 203 E. Carr St to the Property Info sheet. Safe to re-run (skips existing rows). | Manual only |
 | `seed-units-from-csv.mjs` | One-time seed from `Mills_Dashboard_Property_info_sheet.csv` → Supabase units | Manual only |
 | `migrate-sheet2-to-gsheet.mjs` | One-time migration — Numbers Sheet 2 → Google Sheet (run once to populate new columns) | Manual only |
+
+## Key Decisions (April 2026)
+
+### Appliance Fields
+- Stove, Stove Replaced, Stove Warranty added to match the pattern of washer/dryer/dishwasher/fridge.
+- Stove is a free-text field (e.g. "GE Gas 30"") — not a boolean like the presence fields.
+- All three live in the Google Sheet only (not synced to Supabase).
+- To add future appliance fields: add to `HEADER_TO_FIELD` + `FIELD_TO_HEADER` in `columns.js`, add to `units.js` appliances section, append column header to the Sheet.
+
+### Unit Row Authority
+- The Property Info Google Sheet is the **sole authority** for what units exist in Supabase.
+- `sync-from-numbers.mjs` never creates unit rows — it only attaches residents to units that already exist.
+- To add a new property: add it to the Property Info Google Sheet first, then run `sync-property-cache.mjs`.
 
 ## Key Decisions (March 2026)
 
