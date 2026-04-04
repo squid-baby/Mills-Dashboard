@@ -44,6 +44,13 @@ const S1 = {
 // the Property Info Google Sheet and synced to Supabase via sync-property-cache.mjs.
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Normalize addresses for matching: lowercase, collapse spaces, trim.
+// "207 B Oak Ave" and "207 B Oak ave" → "207 b oak ave"
+function normalizeAddr(addr) {
+  return (addr || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
 function parseCSV(text) {
   const rows = [];
   for (const line of text.split('\n')) {
@@ -144,28 +151,49 @@ for (let i = 1; i < sheet1Rows.length; i++) {
 
 console.log(`\nFound ${groups.size} units in Sheet1`);
 
-// Upsert units — only address, owner, area from Sheet1.
-// All other property attributes (beds, baths, ac_type, etc.) are managed by
-// sync-property-cache.mjs and not touched here.
-const unitRows = [];
+// Fetch existing units from Supabase — property info sheet is the authoritative
+// source for what units exist. Numbers sync never creates new unit rows.
+const { data: unitData, error: fetchErr } = await sb.from('units').select('id, address, owner_name, area');
+if (fetchErr) { console.error('fetch units failed:', fetchErr.message); process.exit(1); }
+
+// Build two lookup maps: exact address → id, and normalized address → id
+const unitIdMap = Object.fromEntries(unitData.map(u => [u.address, u.id]));
+const normalizedIdMap = Object.fromEntries(unitData.map(u => [normalizeAddr(u.address), u.id]));
+
+// Update owner_name and area for matched units (these come from the Numbers file)
+const ownerUpdates = [];
 for (const [address, rows] of groups) {
   const owner = rows.map(r => clean(r[S1.OWNER])).find(v => v) || '';
   const area  = rows.map(r => clean(r[S1.AREA])).find(v => v) || '';
-  unitRows.push({ address, owner_name: owner, area });
+  const id = unitIdMap[address] ?? normalizedIdMap[normalizeAddr(address)];
+  if (id && (owner || area)) ownerUpdates.push({ id, owner_name: owner || undefined, area: area || undefined });
+}
+if (ownerUpdates.length > 0) {
+  for (const { id, ...fields } of ownerUpdates) {
+    await sb.from('units').update(fields).eq('id', id);
+  }
+  console.log(`  ✓ Updated owner/area for ${ownerUpdates.length} units`);
 }
 
-console.log(`\nUpserting ${unitRows.length} units...`);
-const { error: unitErr } = await sb.from('units').upsert(unitRows, { onConflict: 'address' });
-if (unitErr) { console.error('units upsert failed:', unitErr.message); process.exit(1); }
-console.log('  ✓ units done');
-
-// Fetch unit ID map
-const { data: unitData, error: fetchErr } = await sb.from('units').select('id, address');
-if (fetchErr) { console.error('fetch units failed:', fetchErr.message); process.exit(1); }
-const unitIdMap = Object.fromEntries(unitData.map(u => [u.address, u.id]));
+// Resolve Numbers addresses to existing Supabase unit IDs (normalized matching)
+const unmatched = [];
+const resolvedIds = new Map(); // Numbers address → Supabase unit id
+for (const address of groups.keys()) {
+  const id = unitIdMap[address] ?? normalizedIdMap[normalizeAddr(address)];
+  if (id) {
+    resolvedIds.set(address, id);
+  } else {
+    unmatched.push(address);
+  }
+}
+if (unmatched.length > 0) {
+  console.warn(`\n⚠️  ${unmatched.length} address(es) from Numbers not found in Supabase (skipping residents):`);
+  unmatched.forEach(a => console.warn(`   "${a}"`));
+  console.warn('  Fix: update the address in Amanda\'s Numbers file to match the Property Info sheet exactly.\n');
+}
 
 // Delete existing residents/next_residents for synced units
-const syncedUnitIds = [...groups.keys()].map(a => unitIdMap[a]).filter(Boolean);
+const syncedUnitIds = [...resolvedIds.values()];
 if (syncedUnitIds.length > 0) {
   await sb.from('residents').delete().in('unit_id', syncedUnitIds);
   await sb.from('next_residents').delete().in('unit_id', syncedUnitIds);
@@ -176,7 +204,7 @@ const residentRows = [];
 const nextResidentRows = [];
 
 for (const [address, rows] of groups) {
-  const unitId = unitIdMap[address];
+  const unitId = resolvedIds.get(address);
   if (!unitId) continue;
   const seenKeys = new Set();
 
