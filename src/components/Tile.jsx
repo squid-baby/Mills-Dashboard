@@ -55,31 +55,33 @@ export default function Tile({ unit, onClick, index = 0 }) {
         </div>
       )}
 
-      {/* Inspection condition dot */}
-      {unit._inspectionCondition && (
-        <div
-          title={
-            unit._inspectionCondition === 'up_to_date' ? 'Inspection: Up to date' :
-            unit._inspectionCondition === 'needs_love' ? 'Inspection: Needs love' :
-            'Inspection: At risk'
-          }
-          style={{
-            position: 'absolute',
-            top: topAlert ? 28 : 8,
-            right: 10,
-            width: 7, height: 7,
-            borderRadius: '50%',
-            background:
-              unit._inspectionCondition === 'up_to_date' ? '#34d399' :
-              unit._inspectionCondition === 'needs_love' ? '#fbbf24' :
-              '#f87171',
-            boxShadow:
-              unit._inspectionCondition === 'up_to_date' ? '0 0 6px rgba(52, 211, 153, 0.5)' :
-              unit._inspectionCondition === 'needs_love' ? '0 0 6px rgba(251, 191, 36, 0.5)' :
-              '0 0 6px rgba(248, 113, 113, 0.5)',
-          }}
-        />
-      )}
+      {/* Inspection condition flag */}
+      {unit._inspectionCondition && (() => {
+        const flagColor =
+          unit._inspectionCondition === 'up_to_date' ? '#34d399' :
+          unit._inspectionCondition === 'needs_love' ? '#fbbf24' :
+          '#f87171';
+        const flagLabel =
+          unit._inspectionCondition === 'up_to_date' ? 'Inspection: Up to date' :
+          unit._inspectionCondition === 'needs_love' ? 'Inspection: Needs love' :
+          'Inspection: At risk';
+        return (
+          <div
+            title={flagLabel}
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              right: 0,
+              overflow: 'hidden',
+              borderBottomRightRadius: 'var(--radius-md)',
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 22 22">
+              <polygon points="22,0 22,22 0,22" fill={flagColor} opacity="0.85" />
+            </svg>
+          </div>
+        );
+      })()}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
         <div style={{ minWidth: 0, flex: 1 }}>

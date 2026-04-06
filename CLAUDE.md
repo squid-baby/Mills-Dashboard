@@ -123,7 +123,7 @@ Column positions may shift as the team rearranges the sheet — always rely on h
 ### Notes Migrated to Supabase
 - Notes were previously stored in browser `localStorage` (key `mills_notes`). Now stored in Supabase `notes` table, shared across users/devices.
 - `DetailPanel.jsx` fetches notes via `/api/get-notes` on mount and saves via `/api/save-note` (POST). No more `onAddNote` prop or `_userNotes` enrichment in `App.jsx`.
-- CSV export ("Export Turnovers") fetches dashboard notes from Supabase and includes them in a separate "Dashboard Notes" column alongside the existing "Turnover Notes" (from Amanda's spreadsheet).
+- CSV export ("Export Turnovers") fetches dashboard notes from Supabase ("Dashboard Notes" column) and full inspection detail per unit, alongside "Turnover Notes" (from Amanda's spreadsheet).
 - Export now respects the current filtered view — if you filter to one property, only that property exports.
 - `created_by` defaults to `'Team'` for all notes (no per-user auth yet).
 
@@ -167,7 +167,10 @@ Column positions may shift as the team rearranges the sheet — always rely on h
 - Full inspection form: replacement items, paint, 50+ condition assessment items, overall rating.
 - Data saved to Google Sheet as JSON blob per inspection.
 - Overall condition (Up to date / Needs love / At risk) shows as colored dot on tiles.
-- Export button in main header: "Export Turnovers" — exports current filtered view (only future move-in dates). Includes both "Turnover Notes" (spreadsheet) and "Dashboard Notes" (Supabase). Shows "Exporting..." while fetching notes.
+- Export button in main header: "Export Turnovers" — exports current filtered view (only future move-in dates). Shows "Exporting..." while fetching data.
+- Export CSV columns: Address, Beds, Lease End, Move Out, Move In, Turn Window (days), Current Tenants, Next Tenants, Overall Condition, Inspector, Inspection Date, Overall Notes, Replacement Items, Needs Attention Now, Update Next Turn, Paint, Turnover Notes (from Amanda's spreadsheet), Dashboard Notes (from Supabase).
+- `Turnover Notes` = `unit.notes` (resident notes from Supabase, sourced from Amanda's Numbers col 9). `turnoverNotes` field on unit objects is always empty — do not use it.
+- Full inspection detail is fetched per-unit via `/api/get-inspection` during export (not from the `inspectionConditions` summary map).
 
 ## Troubleshooting
 
