@@ -8,6 +8,38 @@ import GroupHeader from './components/GroupHeader';
 
 const POLL_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
+function formatReplacementItems(items) {
+  if (!items) return '';
+  const parts = [];
+  (items.blinds || []).forEach(b => { if (b.qty > 0) parts.push(`Blind ${b.width}x${b.drop} x${b.qty}`); });
+  (items.bulbs || []).forEach(b => { if (b.qty > 0) parts.push(`Bulb ${b.type} ${b.temp} x${b.qty}`); });
+  (items.stoveParts || []).forEach(s => { if (s.qty > 0) parts.push(`Stove ${s.type}${s.brand ? ' (' + s.brand + ')' : ''} x${s.qty}`); });
+  (items.toiletSeats || []).forEach(t => { if (t.qty > 0) parts.push(`Toilet seat ${t.shape} x${t.qty}`); });
+  (items.outlets || []).forEach(o => { if (o.qty > 0) parts.push(`${o.type} ${o.color} ${o.gang} x${o.qty}`); });
+  if (items.detectors?.qty > 0) parts.push(`${items.detectors.type} x${items.detectors.qty}`);
+  (items.keys || []).forEach(k => { if (k.missing > 0) parts.push(`${k.type} missing x${k.missing}`); });
+  (items.customItems || []).forEach(c => { if (c.name && c.qty > 0) parts.push(`${c.name}${c.spec ? ' ' + c.spec : ''} x${c.qty}`); });
+  return parts.join('; ');
+}
+
+function formatConditionItems(items, level) {
+  if (!items?.conditions) return '';
+  return Object.entries(items.conditions)
+    .filter(([, v]) => v.condition === level)
+    .map(([name, v]) => v.notes ? `${name} (${v.notes})` : name)
+    .join('; ');
+}
+
+function formatPaint(items) {
+  if (!items?.paintRows?.length) return '';
+  return items.paintRows.map(p => {
+    const color = p.color === 'Other' ? (p.customColor || 'Other') : p.color;
+    const cond = p.condition === 'now' ? ' [Update now]' : p.condition === 'next' ? ' [Next turn]' : '';
+    const notes = p.notes ? ` — ${p.notes}` : '';
+    return `${p.location}: ${color} ${p.finish}${cond}${notes}`;
+  }).join('; ');
+}
+
 async function exportTurnoverData(units, inspectionConditions) {
   // Filter to units with a future move-in date
   const now = new Date();
@@ -23,15 +55,25 @@ async function exportTurnoverData(units, inspectionConditions) {
     return;
   }
 
-  // Fetch dashboard notes for all turnover units in parallel
-  const notesPerUnit = await Promise.all(
-    turnoverUnits.map(u =>
-      fetch(`/api/get-notes?unit_id=${u.id}`)
-        .then(r => r.json())
-        .then(data => data.notes || [])
-        .catch(() => [])
-    )
-  );
+  // Fetch dashboard notes and full inspections for all turnover units in parallel
+  const [notesPerUnit, inspectionsPerUnit] = await Promise.all([
+    Promise.all(
+      turnoverUnits.map(u =>
+        fetch(`/api/get-notes?unit_id=${u.id}`)
+          .then(r => r.json())
+          .then(data => data.notes || [])
+          .catch(() => [])
+      )
+    ),
+    Promise.all(
+      turnoverUnits.map(u =>
+        fetch(`/api/get-inspection?address=${encodeURIComponent(u.address)}`)
+          .then(r => r.json())
+          .then(data => data.inspection || null)
+          .catch(() => null)
+      )
+    ),
+  ]);
 
   const conditionLabel = (c) =>
     c === 'up_to_date' ? 'Up to date' :
@@ -43,7 +85,13 @@ async function exportTurnoverData(units, inspectionConditions) {
     return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
 
-  const headers = ['Address', 'Beds', 'Lease End', 'Move Out', 'Move In', 'Turn Window (days)', 'Current Tenants', 'Next Tenants', 'Overall Condition', 'Turnover Notes', 'Dashboard Notes'];
+  const headers = [
+    'Address', 'Beds', 'Lease End', 'Move Out', 'Move In', 'Turn Window (days)',
+    'Current Tenants', 'Next Tenants',
+    'Overall Condition', 'Inspector', 'Inspection Date', 'Overall Notes',
+    'Replacement Items', 'Needs Attention Now', 'Update Next Turn', 'Paint',
+    'Turnover Notes', 'Dashboard Notes',
+  ];
   const rows = turnoverUnits.map((u, idx) => {
     let windowDays = '';
     if (u.moveOutDate && u.moveInDate) {
@@ -54,6 +102,7 @@ async function exportTurnoverData(units, inspectionConditions) {
       windowDays = Math.ceil((inn - out) / 864e5);
     }
     const dashboardNotes = notesPerUnit[idx].map(n => n.text).join('; ');
+    const insp = inspectionsPerUnit[idx];
     return [
       u.address,
       u.beds,
@@ -64,7 +113,14 @@ async function exportTurnoverData(units, inspectionConditions) {
       u.residents.map(r => r.name).join('; '),
       u.nextResidents.map(r => r.name).join('; '),
       conditionLabel(inspectionConditions[u.address] || ''),
-      u.turnoverNotes,
+      insp?.inspector || '',
+      insp?.date || '',
+      insp?.overallNotes || '',
+      formatReplacementItems(insp?.items),
+      formatConditionItems(insp?.items, 'now'),
+      formatConditionItems(insp?.items, 'next'),
+      formatPaint(insp?.items),
+      u.notes,
       dashboardNotes,
     ].map(escCSV).join(',');
   });
