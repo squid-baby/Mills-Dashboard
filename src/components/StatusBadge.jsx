@@ -1,15 +1,19 @@
-import { GC } from '../data/units';
+import { getGC } from '../data/units';
 
-export default function StatusBadge({ group }) {
-  const c = GC[group] || GC.unknown;
+export default function StatusBadge({ group, theme = 'dark' }) {
+  const palette = getGC(theme);
+  const c = palette[group] || palette.unknown;
+  const bg = theme === 'light' ? c.bg : c.color + '15';
+  const textColor = theme === 'light' ? c.text : c.color;
+  const borderColor = theme === 'light' ? c.color + '50' : c.color + '20';
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 5,
       padding: '3px 10px', borderRadius: 'var(--radius-sm)',
       fontSize: 12, fontWeight: 600,
-      background: c.color + '15',
-      color: c.color,
-      border: `1px solid ${c.color}20`,
+      background: bg,
+      color: textColor,
+      border: `1px solid ${borderColor}`,
       letterSpacing: '0.01em',
     }}>
       <span style={{ fontSize: 12 }}>{c.icon}</span>

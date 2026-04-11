@@ -12,6 +12,20 @@ export const GC = {
   month_to_month:      { label: "Month-to-Month",       color: "#78716c", bg: "#1c1917", text: "#d6d3d1", icon: "∞" },
 };
 
+// Light mode palette — pastels with accessible dark text (all ≥ 4.5:1 contrast)
+export const GC_LIGHT = {
+  renewed:             { label: "Renewed",              color: "#0d7a50", bg: "#bdfde6", text: "#065238", icon: "✓" },
+  renewing:            { label: "Renewing",             color: "#4a6b00", bg: "#f4fdbd", text: "#354d00", icon: "↻" },
+  partial_turn:        { label: "Partial Turn",         color: "#3d2db5", bg: "#c6bdfd", text: "#2a1d80", icon: "◐" },
+  partial_turn_leased: { label: "Partial (Lease Done)", color: "#5140c0", bg: "#ddd6fe", text: "#3b2e90", icon: "◑" },
+  unknown:             { label: "Unknown",              color: "#4a4a58", bg: "#e8e9ec", text: "#383845", icon: "?" },
+  full_turnover:       { label: "Full Turnover",        color: "#9e1a52", bg: "#fdbdd4", text: "#7a1040", icon: "⟳" },
+  turnover_rented:     { label: "Turnover (Rented)",    color: "#7a4800", bg: "#fddb82", text: "#5e3700", icon: "★" },
+  month_to_month:      { label: "Month-to-Month",       color: "#4a4a58", bg: "#ebebee", text: "#383845", icon: "∞" },
+};
+
+export const getGC = (theme) => theme === 'light' ? GC_LIGHT : GC;
+
 // Amanda's priority: turnovers first, unknowns next, renewals last
 export const PRIO = [
   'full_turnover',

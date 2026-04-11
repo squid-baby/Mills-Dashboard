@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
-import { GC, getAlerts, parseDate, daysUntil } from '../data/units';
+import { getGC, getAlerts, parseDate, daysUntil } from '../data/units';
 import StatusBadge from './StatusBadge';
 import PropertyInfoTab from './PropertyInfoTab';
 import TurnoverTab from './TurnoverTab';
 
-export default function DetailPanel({ unit, onClose }) {
+export default function DetailPanel({ unit, onClose, theme = 'dark' }) {
   const [noteText, setNoteText] = useState('');
   const [localNotes, setLocalNotes] = useState([]);
   const [notesLoading, setNotesLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('tenant');
-  const c = GC[unit.group] || GC.unknown;
+  const palette = getGC(theme);
+  const c = palette[unit.group] || palette.unknown;
 
   useEffect(() => {
     setNoteText('');
@@ -102,7 +103,7 @@ export default function DetailPanel({ unit, onClose }) {
             }}>
               {unit.address}
             </h2>
-            <div style={{ marginTop: 8 }}><StatusBadge group={unit.group} /></div>
+            <div style={{ marginTop: 8 }}><StatusBadge group={unit.group} theme={theme} /></div>
           </div>
           <button
             onClick={onClose}
@@ -168,8 +169,8 @@ export default function DetailPanel({ unit, onClose }) {
           <div style={{ animation: 'fadeIn 200ms ease' }}>
             {/* Substate banner */}
             <div style={{
-              background: c.color + '0c',
-              border: `1px solid ${c.color}20`,
+              background: theme === 'light' ? c.bg : c.color + '0c',
+              border: `1px solid ${c.color}${theme === 'light' ? '50' : '20'}`,
               borderRadius: 'var(--radius-md)',
               padding: '10px 14px',
               marginBottom: alerts.length > 0 ? 10 : 20,

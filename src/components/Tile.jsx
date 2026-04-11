@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { GC, getAlerts } from '../data/units';
+import { getGC, getAlerts } from '../data/units';
 
-export default function Tile({ unit, onClick, index = 0 }) {
+export default function Tile({ unit, onClick, index = 0, theme = 'dark' }) {
   const [hovered, setHovered] = useState(false);
-  const c = GC[unit.group] || GC.unknown;
+  const palette = getGC(theme);
+  const c = palette[unit.group] || palette.unknown;
   const alerts = getAlerts(unit);
   const urgent = alerts.length > 0;
   const topAlert = alerts[0]; // worst alert for badge display

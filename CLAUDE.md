@@ -118,6 +118,30 @@ Column positions may shift as the team rearranges the sheet — always rely on h
 | `seed-units-from-csv.mjs` | One-time seed from `Mills_Dashboard_Property_info_sheet.csv` → Supabase units | Manual only |
 | `migrate-sheet2-to-gsheet.mjs` | One-time migration — Numbers Sheet 2 → Google Sheet (run once to populate new columns) | Manual only |
 
+## Theming
+
+### Light/Dark Mode Toggle
+The dashboard supports dark and light mode with a toggle button (sun/moon icon) in the header.
+
+**How it works:**
+- Inline `<script>` in `index.html` sets `data-theme` attribute on `<html>` before React renders (no flash)
+- Reads `localStorage('mills_theme')`, falls back to `prefers-color-scheme` system preference
+- React state in `App.jsx` stays in sync and persists choice to localStorage
+- CSS custom properties in `src/index.css` handle surfaces, text, borders, shadows — `:root` = dark defaults, `[data-theme="light"]` = overrides
+
+**Status badge colors:**
+- Dark mode palette: `GC` in `src/data/units.js` — bright colors on dark backgrounds
+- Light mode palette: `GC_LIGHT` in `src/data/units.js` — pastel backgrounds with dark text
+- Helper: `getGC(theme)` returns the correct palette
+- All light mode text/background pairs verified WCAG AA (4.5:1 minimum contrast)
+
+**Adding new theme-aware colors:**
+1. Add the CSS variable to both `:root` and `[data-theme="light"]` in `src/index.css`
+2. For status-specific colors, add entries to both `GC` and `GC_LIGHT` in `src/data/units.js`
+3. Components receive `theme` as a prop from `App.jsx` and use `getGC(theme)` instead of `GC` directly
+
+**Not yet themed (Phase 2):** Hardcoded semantic colors in components — red alerts (`#f87171`), green success (`#34d399`), yellow warnings (`#fbbf24`). These read fine on light backgrounds but aren't perfectly tuned.
+
 ## Key Decisions (April 2026)
 
 ### Notes Migrated to Supabase

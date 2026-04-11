@@ -1,6 +1,7 @@
-import { GC } from '../data/units';
+import { GC, getGC } from '../data/units';
 
-export default function SummaryBar({ units }) {
+export default function SummaryBar({ units, theme = 'dark' }) {
+  const palette = getGC(theme);
   const counts = {};
   units.forEach(u => { counts[u.group] = (counts[u.group] || 0) + 1; });
 
@@ -10,12 +11,15 @@ export default function SummaryBar({ units }) {
       paddingBottom: 12,
     }}>
       {Object.keys(GC).map(key => {
-        const cfg = GC[key];
+        const cfg = palette[key];
         const count = counts[key] || 0;
+        const bg = count > 0
+          ? (theme === 'light' ? cfg.bg : cfg.color + '0c')
+          : 'transparent';
         return (
           <div key={key} style={{
             display: 'flex', alignItems: 'center', gap: 5,
-            background: count > 0 ? cfg.color + '0c' : 'transparent',
+            background: bg,
             borderRadius: 'var(--radius-sm)',
             padding: '3px 8px',
             transition: 'all var(--duration-fast) ease',
@@ -23,7 +27,7 @@ export default function SummaryBar({ units }) {
           }}>
             <span style={{
               fontSize: 13, fontWeight: 700,
-              color: cfg.color,
+              color: theme === 'light' ? cfg.text : cfg.color,
               fontVariantNumeric: 'tabular-nums',
             }}>
               {count}

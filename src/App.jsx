@@ -138,6 +138,15 @@ async function exportTurnoverData(units, inspectionConditions) {
 }
 
 export default function App() {
+  const [theme, setTheme] = useState(
+    () => document.documentElement.getAttribute('data-theme') || 'dark'
+  );
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('mills_theme', theme);
+  }, [theme]);
+
   const [units, setUnits] = useState(SEED_UNITS);
   const [dataSource, setDataSource] = useState('local'); // 'local' | 'live'
   const [lastSynced, setLastSynced] = useState(null);
@@ -269,7 +278,7 @@ export default function App() {
 
       {/* Detail panel */}
       {selectedUnit && (
-        <DetailPanel unit={selectedUnit} onClose={() => setSelectedId(null)} />
+        <DetailPanel unit={selectedUnit} onClose={() => setSelectedId(null)} theme={theme} />
       )}
 
       {/* Header */}
@@ -277,7 +286,7 @@ export default function App() {
         padding: '0 24px',
         borderBottom: '1px solid var(--border-subtle)',
         position: 'sticky', top: 0,
-        background: 'rgba(10, 10, 12, 0.85)',
+        background: 'var(--header-glass)',
         backdropFilter: 'blur(16px) saturate(180%)',
         WebkitBackdropFilter: 'blur(16px) saturate(180%)',
         zIndex: 40,
@@ -360,6 +369,28 @@ export default function App() {
               }}
             />
           </div>
+
+          <button
+            onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
+            aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+            aria-pressed={theme === 'light'}
+            style={{
+              flexShrink: 0,
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-default)',
+              borderRadius: 'var(--radius-md)',
+              width: 44, height: 34,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+              fontSize: 16,
+              transition: 'all var(--duration-fast) ease',
+              color: 'var(--text-secondary)',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
+          >
+            {theme === 'light' ? '☾' : '☀'}
+          </button>
         </div>
 
         {/* Toolbar: Sort + Filter */}
@@ -486,7 +517,7 @@ export default function App() {
           </span>
         </div>
 
-        <SummaryBar units={filtered} />
+        <SummaryBar units={filtered} theme={theme} />
       </header>
 
       {/* Grid */}
@@ -505,7 +536,7 @@ export default function App() {
                 gap: 10,
               }}>
                 {groupUnits.map((u, i) => (
-                  <Tile key={u.id} unit={u} onClick={() => setSelectedId(u.id)} index={i} />
+                  <Tile key={u.id} unit={u} onClick={() => setSelectedId(u.id)} index={i} theme={theme} />
                 ))}
               </div>
             </div>
