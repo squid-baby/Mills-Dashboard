@@ -1,0 +1,41 @@
+name: Sync Numbers → Supabase
+
+on:
+  schedule:
+    - cron: '0 14 * * *'  # 9 AM EST (UTC-5) daily
+  workflow_dispatch:        # manual trigger from GitHub mobile app
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Node deps
+        run: npm ci
+
+      - name: Install numbers-parser
+        run: pip install numbers-parser
+
+      - name: Download .numbers file from Drive
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          NUMBERS_FILE_ID: ${{ secrets.NUMBERS_FILE_ID }}
+        run: node scripts/download-numbers-file.mjs
+
+      - name: Sync to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          NUMBERS_FILE: /tmp/mills_export/2025-2026 Renewals_Dashboard.numbers
+        run: node scripts/sync-from-numbers.mjs

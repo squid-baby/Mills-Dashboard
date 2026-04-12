@@ -93,7 +93,8 @@ function parseDate(val) {
 }
 
 // ─── Export from Numbers via numbers-parser (Python) ─────────────────────────
-const NUMBERS_FILE = '/Volumes/One Touch/The_Team_Google_Drive Sync/2025-2026 Renewals_Dashboard.numbers';
+const NUMBERS_FILE = process.env.NUMBERS_FILE
+  || '/Volumes/One Touch/The_Team_Google_Drive Sync/2025-2026 Renewals_Dashboard.numbers';
 const EXPORT_DIR = '/tmp/mills_export';
 
 function exportFromNumbers() {
