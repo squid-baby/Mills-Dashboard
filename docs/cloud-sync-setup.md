@@ -4,7 +4,7 @@ Moves the Numbers → Supabase sync off the local machine and into GitHub Action
 
 ## How It Works
 
-1. GitHub Actions workflow runs on a cron schedule (or manual dispatch)
+1. GitHub Actions workflow runs daily at 9 AM EST (or manual dispatch from GitHub mobile app)
 2. Downloads `2025-2026 Renewals_Dashboard.numbers` from Google Drive using the existing service account
 3. Runs `numbers-parser` (Python) to export CSV to `/tmp/`
 4. Runs `sync-from-numbers.mjs` to upsert residents into Supabase
@@ -27,7 +27,7 @@ Add these in **GitHub → repo → Settings → Secrets and variables → Action
 | `SUPABASE_URL` | Same as your local `.env` |
 | `SUPABASE_SERVICE_KEY` | Same as your local `.env` |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Same as your local `.env` (full JSON string) |
-| `NUMBERS_FILE_ID` | `1MnLVtMdRBruXrzopPBTzco2g2WmavRk3` |
+| `NUMBERS_FILE_ID` | `1MnLVtMdRBruXrzopPBTzco2g2WmavRk3` (the Numbers file must be shared with the service account email — already done) |
 
 ## Workflow File (`.github/workflows/sync-numbers.yml`)
 
@@ -36,7 +36,7 @@ name: Sync Numbers → Supabase
 
 on:
   schedule:
-    - cron: '0 * * * *'   # every hour
+    - cron: '0 14 * * *'  # 9 AM EST (UTC-5) daily
   workflow_dispatch:        # manual trigger from GitHub mobile app
 
 jobs:
@@ -128,4 +128,4 @@ The local fallback means the script still works on the local machine unchanged.
 
 ## Keeping Local Sync
 
-The local scheduled task can stay active as a backup — the env var fallback means it still reads from `/Volumes/One Touch/...` when run locally. Both paths upsert to the same Supabase tables, so running both is safe (idempotent).
+The env var fallback means the script still works on the local machine unchanged. However, **do not run both the local scheduled task and GitHub Actions simultaneously** — the sync does a delete-then-insert for residents, so overlapping runs can cause duplicates or momentary data loss. Once the GitHub Actions workflow is validated, disable the local scheduled task. Use manual dispatch from the GitHub mobile app for one-off syncs.
