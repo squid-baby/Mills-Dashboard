@@ -8,6 +8,25 @@ import GroupHeader from './components/GroupHeader';
 import CalendarView from './components/calendar/CalendarView';
 
 const POLL_INTERVAL = 30 * 60 * 1000; // 30 minutes
+const CACHE_KEY = 'mills_units_cache';
+
+function loadCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatSyncAgo(date) {
+  if (!date) return null;
+  const mins = Math.round((Date.now() - date.getTime()) / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
 
 function formatReplacementItems(items) {
   if (!items) return '';
@@ -149,9 +168,13 @@ export default function App() {
   }, [theme]);
 
   const [view, setView] = useState('dashboard'); // 'dashboard' | 'calendar'
-  const [units, setUnits] = useState(SEED_UNITS);
-  const [dataSource, setDataSource] = useState('local'); // 'local' | 'live'
-  const [lastSynced, setLastSynced] = useState(null);
+  const [units, setUnits] = useState(() => loadCache()?.units ?? SEED_UNITS);
+  const [dataSource, setDataSource] = useState(() => loadCache() ? 'cached' : 'local');
+  const [lastSynced, setLastSynced] = useState(() => {
+    const c = loadCache();
+    return c?.fetchedAt ? new Date(c.fetchedAt) : null;
+  });
+  const [fetchError, setFetchError] = useState(null);
 
   const [sortBy, setSortBy] = useState('date');
   const [filterGroup, setFilterGroup] = useState(null);
@@ -169,12 +192,19 @@ export default function App() {
         if (!res.ok) throw new Error(res.statusText);
         const data = await res.json();
         if (data.units && data.units.length > 0) {
+          const fetchedAt = new Date().toISOString();
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify({ units: data.units, fetchedAt })); } catch {}
           setUnits(data.units);
           setDataSource('live');
-          setLastSynced(new Date());
+          setLastSynced(new Date(fetchedAt));
+          setFetchError(null);
+        } else if (data.source === 'none') {
+          setFetchError('Missing Supabase credentials on Netlify');
+        } else if (data.source === 'error') {
+          setFetchError(data.error || 'Supabase query failed');
         }
-      } catch {
-        // Silently fall back to seed/current data
+      } catch (err) {
+        setFetchError(err.message || 'Network error');
       }
     }
     fetchUnits();
@@ -255,9 +285,7 @@ export default function App() {
 
 
   // Time since last sync
-  const syncAgo = lastSynced
-    ? Math.round((Date.now() - lastSynced.getTime()) / 60000) + 'm ago'
-    : null;
+  const syncAgo = formatSyncAgo(lastSynced);
 
   const hasFilters = filterGroup || filterArea || searchText;
 
@@ -366,17 +394,38 @@ export default function App() {
                   Synced {syncAgo}
                 </span>
               )}
+              {dataSource === 'cached' && syncAgo && (
+                <span
+                  title={fetchError ? `Live fetch failed: ${fetchError}` : 'Showing cached data from last successful sync'}
+                  style={{
+                    fontSize: 11, fontWeight: 500, color: '#fbbf24',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    cursor: 'help',
+                  }}
+                >
+                  <span style={{
+                    width: 6, height: 6, borderRadius: '50%',
+                    background: '#fbbf24',
+                    display: 'inline-block',
+                  }} />
+                  Synced {syncAgo} (stale)
+                </span>
+              )}
               {dataSource === 'local' && (
-                <span style={{
-                  fontSize: 11, fontWeight: 500, color: '#fb923c',
-                  display: 'flex', alignItems: 'center', gap: 4,
-                }}>
+                <span
+                  title={fetchError || undefined}
+                  style={{
+                    fontSize: 11, fontWeight: 500, color: '#fb923c',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    cursor: fetchError ? 'help' : 'default',
+                  }}
+                >
                   <span style={{
                     width: 6, height: 6, borderRadius: '50%',
                     background: '#fb923c',
                     display: 'inline-block',
                   }} />
-                  Local data
+                  Local data{fetchError ? ' ⚠' : ''}
                 </span>
               )}
             </div>
