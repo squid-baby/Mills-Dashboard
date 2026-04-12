@@ -1,10 +1,11 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { GC, PRIO, SORT_OPTS, SEED_UNITS, parseDate, fmtMonth, daysUntil } from './data/units';
 import StatusBadge from './components/StatusBadge';
 import Tile from './components/Tile';
 import DetailPanel from './components/DetailPanel';
 import SummaryBar from './components/SummaryBar';
 import GroupHeader from './components/GroupHeader';
+import CalendarView from './components/calendar/CalendarView';
 
 const POLL_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
@@ -147,6 +148,7 @@ export default function App() {
     localStorage.setItem('mills_theme', theme);
   }, [theme]);
 
+  const [view, setView] = useState('dashboard'); // 'dashboard' | 'calendar'
   const [units, setUnits] = useState(SEED_UNITS);
   const [dataSource, setDataSource] = useState('local'); // 'local' | 'live'
   const [lastSynced, setLastSynced] = useState(null);
@@ -259,6 +261,49 @@ export default function App() {
 
   const hasFilters = filterGroup || filterArea || searchText;
 
+  const themeButton = (
+    <button
+      onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
+      aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+      aria-pressed={theme === 'light'}
+      style={{
+        flexShrink: 0,
+        background: 'var(--bg-elevated)',
+        border: '1px solid var(--border-default)',
+        borderRadius: 'var(--radius-md)',
+        width: 44, height: 34,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer',
+        fontSize: 16,
+        transition: 'all var(--duration-fast) ease',
+        color: 'var(--text-secondary)',
+      }}
+      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+      onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
+    >
+      {theme === 'light' ? '☾' : '☀'}
+    </button>
+  );
+
+  // ── Calendar view ─────────────────────────────────────────────────────────
+  if (view === 'calendar') {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg-root)', color: 'var(--text-primary)' }}>
+        <CalendarView
+          units={enriched}
+          theme={theme}
+          themeButton={themeButton}
+          onBack={() => setView('dashboard')}
+          onViewUnit={(address) => {
+            const u = enriched.find(u => u.address === address);
+            if (u) { setSelectedId(u.id); setView('dashboard'); }
+          }}
+        />
+      </div>
+    );
+  }
+
+  // ── Dashboard view ────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-root)', color: 'var(--text-primary)' }}>
       {/* Overlay */}
@@ -281,7 +326,7 @@ export default function App() {
         <DetailPanel unit={selectedUnit} onClose={() => setSelectedId(null)} theme={theme} />
       )}
 
-      {/* Header */}
+      {/* Header — Dashboard mode */}
       <header style={{
         padding: '0 24px',
         borderBottom: '1px solid var(--border-subtle)',
@@ -291,7 +336,7 @@ export default function App() {
         WebkitBackdropFilter: 'blur(16px) saturate(180%)',
         zIndex: 40,
       }}>
-        {/* Top row: Brand + search */}
+        {/* Top row: Brand + search + calendar button */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           padding: '16px 0 12px', gap: 16,
@@ -337,60 +382,61 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ position: 'relative', maxWidth: 280, flex: '0 1 280px' }}>
-            <svg style={{
-              position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
-              width: 14, height: 14, color: 'var(--text-muted)',
-            }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-            </svg>
-            <input
-              type="text" value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-              placeholder="Search..."
-              style={{
-                width: '100%',
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-default)',
-                borderRadius: 'var(--radius-md)',
-                padding: '7px 12px 7px 32px',
-                color: 'var(--text-primary)',
-                fontSize: 13,
-                outline: 'none',
-                transition: 'border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease',
-              }}
-              onFocus={e => {
-                e.target.style.borderColor = 'rgba(99, 102, 241, 0.5)';
-                e.target.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)';
-              }}
-              onBlur={e => {
-                e.target.style.borderColor = 'var(--border-default)';
-                e.target.style.boxShadow = 'none';
-              }}
-            />
-          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ position: 'relative', maxWidth: 280, flex: '0 1 280px' }}>
+              <svg style={{
+                position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
+                width: 14, height: 14, color: 'var(--text-muted)',
+              }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+              </svg>
+              <input
+                type="text" value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                placeholder="Search..."
+                style={{
+                  width: '100%',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-default)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '7px 12px 7px 32px',
+                  color: 'var(--text-primary)',
+                  fontSize: 13,
+                  outline: 'none',
+                  transition: 'border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease',
+                }}
+                onFocus={e => {
+                  e.target.style.borderColor = 'rgba(99, 102, 241, 0.5)';
+                  e.target.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)';
+                }}
+                onBlur={e => {
+                  e.target.style.borderColor = 'var(--border-default)';
+                  e.target.style.boxShadow = 'none';
+                }}
+              />
+            </div>
 
-          <button
-            onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
-            aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-            aria-pressed={theme === 'light'}
-            style={{
-              flexShrink: 0,
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-md)',
-              width: 44, height: 34,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer',
-              fontSize: 16,
-              transition: 'all var(--duration-fast) ease',
-              color: 'var(--text-secondary)',
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
-          >
-            {theme === 'light' ? '☾' : '☀'}
-          </button>
+            <button
+              onClick={() => setView('calendar')}
+              style={{
+                background: 'var(--accent)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                padding: '6px 14px',
+                fontSize: 12, fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all var(--duration-fast) ease',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'var(--accent)'}
+            >
+              Calendar
+            </button>
+
+            {themeButton}
+          </div>
         </div>
 
         {/* Toolbar: Sort + Filter */}

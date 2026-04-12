@@ -50,6 +50,7 @@ Until fixed, those properties will have orphan unit rows in Supabase with no pro
 - `unit_full` — view joining units + residents + next_residents (reference only; `get-units.js` queries tables directly to get all fields including phone and move_out_date)
 - `notes` — per-unit notes (id, unit_id, text, created_by, created_at)
 - `inspections` — per-unit inspection records (id, unit_id, inspector, inspection_date, overall_condition, overall_notes, items_json, created_at, updated_at)
+- `calendar_tasks` — turnover calendar tasks (id uuid, unit_address text, task_type, start_date, start_slot, end_date, end_slot, crew, notes, status, created_at, updated_at)
 - `pending_changes`, `sync_log` — supporting tables
 
 **Phase 2 SQL (already run):** Added 11 new columns to `units` + created `notes` and `inspections` tables. If setting up fresh, run the SQL block from the Phase 2 migration handoff.
@@ -90,6 +91,9 @@ Until fixed, those properties will have orphan unit rows in Supabase with no pro
 | `get-all-inspections` | GET | Fetches all inspection summaries (address + overallCondition) |
 | `get-notes` | GET | Fetches all notes for a unit from Supabase `notes` table (by `unit_id`) |
 | `save-note` | POST | Inserts a note into Supabase `notes` table (`unit_id`, `text`, `created_by`) |
+| `get-calendar-tasks` | GET | Fetches calendar tasks by date range (`?start=&end=`), overlap query |
+| `save-calendar-task` | POST | Upsert calendar task (id present → update, else insert) |
+| `delete-calendar-task` | POST | Delete calendar task by `{ id }` |
 
 ### Column Config (`src/config/columns.js`)
 Single source of truth for the Google Sheet ↔ field key mapping. Both `get-property-info.js` and `update-property-info.js` import from here — **add new fields here only**.
@@ -141,6 +145,43 @@ The dashboard supports dark and light mode with a toggle button (sun/moon icon) 
 3. Components receive `theme` as a prop from `App.jsx` and use `getGC(theme)` instead of `GC` directly
 
 **Not yet themed (Phase 2):** Hardcoded semantic colors in components — red alerts (`#f87171`), green success (`#34d399`), yellow warnings (`#fbbf24`). These read fine on light backgrounds but aren't perfectly tuned.
+
+## Turnover Calendar
+
+### Overview
+Swimlane-style calendar for scheduling turnover work during May–August season. Accessible from the "Calendar" button in the dashboard header. The header morphs between dashboard and calendar modes (no extra nav bar).
+
+### Architecture
+- **Views**: Month (grid with task pills, click day → Day), Week (swimlane with AM/PM slots), Day (expanded task cards)
+- **Data**: `calendar_tasks` table in Supabase, keyed by `unit_address` (text, not unit_id FK — because `get-units.js` replaces Supabase UUIDs with sequential indices)
+- **Task types**: move_out (orange), paint (blue), repair (red), clean (teal), finalize (amber), move_in (green)
+- **Slots**: AM/PM half-day granularity only (no hour grid)
+- **Ghost tasks**: Client-side generated from lease data (leaseEnd → ghost move_out, moveInDate → ghost move_in) for turnover units missing real tasks of those types. Rendered with dashed borders and 50% opacity. Users can Confirm (saves as real task) or Dismiss (hidden for session).
+
+### Key Files
+| File | Purpose |
+|------|---------|
+| `src/data/calendar.js` | Task colors (dark/light), date/slot helpers, lane assignment algorithm |
+| `src/components/calendar/CalendarView.jsx` | Main container — state, data fetching, ghost task generation, zoom switching |
+| `src/components/calendar/MonthView.jsx` | Month grid with colored task pills per day |
+| `src/components/calendar/DayView.jsx` | AM/PM sections with expanded task cards |
+| `src/components/calendar/TaskCreateModal.jsx` | Create task modal with unit picker, type buttons, date/slot pickers |
+| `src/components/calendar/PropertyDetailPanel.jsx` | Slide-in panel showing all tasks for a property, edit/delete/confirm/dismiss |
+
+### Task Color Config
+- Dark mode: `TASK_COLORS` in `src/data/calendar.js`
+- Light mode: `TASK_COLORS_LIGHT` in `src/data/calendar.js`
+- Helper: `getTaskColors(theme)` — mirrors the `getGC(theme)` pattern from units
+
+### Key Gotchas
+- **`unit_address` not `unit_id`**: Calendar tasks reference units by address string, not Supabase UUID. This is because `get-units.js` `buildUnit()` replaces the real UUID with a sequential index — so the frontend `unit.id` is NOT the Supabase ID.
+- **`task_type` not `type`**: The Supabase column and all data objects use `task_type`. Do not use `task.type` — it will be undefined and fall back to the clean color.
+- **`turnoverNotes` is always empty**: Use `unit.notes` for actual resident notes (from Amanda's Numbers col 9).
+- **Ghost tasks are session-only**: Dismissed ghosts reset on page refresh. Confirmed ghosts become real Supabase tasks.
+
+### Planned Enhancements
+- Drag-to-reschedule (mousedown/touchstart → snap to slot on release)
+- Mobile polish (touch targets, full-screen modals, responsive week grid)
 
 ## Key Decisions (April 2026)
 
