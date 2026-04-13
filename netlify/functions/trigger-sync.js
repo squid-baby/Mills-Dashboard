@@ -6,9 +6,9 @@ export async function handler(event) {
     return { statusCode: 405, body: 'Method not allowed' };
   }
 
-  const token = process.env.GITHUB_TOKEN;
+  const token = process.env.GH_DISPATCH_TOKEN || process.env.GITHUB_TOKEN;
   if (!token) {
-    return { statusCode: 500, body: JSON.stringify({ ok: false, message: 'GITHUB_TOKEN not configured' }) };
+    return { statusCode: 500, body: JSON.stringify({ ok: false, message: 'GH_DISPATCH_TOKEN not configured' }) };
   }
 
   const res = await fetch(
