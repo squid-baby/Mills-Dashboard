@@ -10,3 +10,4 @@ dist/
 *_Sync_v4/
 *.csv
 *-plan.md
+scripts/meeting-capture/meeting-capture.env

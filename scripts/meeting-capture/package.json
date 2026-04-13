@@ -1,0 +1,14 @@
+{
+  "name": "mills-meeting-capture",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Meeting recording + transcription + email pipeline for Mills Rentals",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
+    "@supabase/supabase-js": "^2.101.0",
+    "dotenv": "^16.6.1",
+    "nodemailer": "^8.0.5",
+    "resend": "^4.0.0"
+  }
+}

@@ -182,6 +182,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [syncing, setSyncing] = useState(null); // null | 'pending' | 'ok' | 'error'
   const [inspectionConditions, setInspectionConditions] = useState({});
 
   // Poll Google Sheets via Netlify Function
@@ -580,6 +581,36 @@ export default function App() {
           )}
 
           <div style={{ flex: 1 }} />
+
+          <button
+            disabled={syncing === 'pending'}
+            onClick={async () => {
+              setSyncing('pending');
+              try {
+                const res = await fetch('/api/trigger-sync', { method: 'POST' });
+                const data = await res.json();
+                setSyncing(data.ok ? 'ok' : 'error');
+              } catch {
+                setSyncing('error');
+              } finally {
+                setTimeout(() => setSyncing(null), 3000);
+              }
+            }}
+            style={{
+              background: 'var(--bg-elevated)',
+              color: syncing === 'ok' ? '#34d399' : syncing === 'error' ? '#f87171' : 'var(--text-muted)',
+              border: `1px solid ${syncing === 'ok' ? '#34d399' : syncing === 'error' ? '#f87171' : 'var(--border-default)'}`,
+              borderRadius: 'var(--radius-sm)',
+              padding: '5px 10px',
+              fontSize: 11, fontWeight: 600,
+              cursor: syncing === 'pending' ? 'wait' : 'pointer',
+              opacity: syncing === 'pending' ? 0.5 : 1,
+              transition: 'all var(--duration-fast) ease',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {syncing === 'pending' ? 'Syncing\u2026' : syncing === 'ok' ? '\u2713 Triggered' : syncing === 'error' ? '\u2717 Failed' : '\u21BB Sync'}
+          </button>
 
           <button
             disabled={exporting}

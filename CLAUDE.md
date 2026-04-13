@@ -94,6 +94,7 @@ Until fixed, those properties will have orphan unit rows in Supabase with no pro
 | `get-calendar-tasks` | GET | Fetches calendar tasks by date range (`?start=&end=`), overlap query |
 | `save-calendar-task` | POST | Upsert calendar task (id present → update, else insert) |
 | `delete-calendar-task` | POST | Delete calendar task by `{ id }` |
+| `trigger-sync` | POST | Dispatches GitHub Actions `sync-numbers.yml` workflow via `workflow_dispatch`. Requires `GITHUB_TOKEN` env var (actions:write scope). Returns `{ ok: true }` on 204 from GitHub. |
 
 ### Column Config (`src/config/columns.js`)
 Single source of truth for the Google Sheet ↔ field key mapping. Both `get-property-info.js` and `update-property-info.js` import from here — **add new fields here only**.
@@ -115,7 +116,7 @@ Column positions may shift as the team rearranges the sheet — always rely on h
 ### Scripts
 | Script | Purpose | Run |
 |--------|---------|-----|
-| `sync-from-numbers.mjs` | Reads Numbers Sheet 1 → attaches residents/next_residents to existing Supabase units; updates owner/area. Never creates new unit rows. | Scheduled + manual |
+| `sync-from-numbers.mjs` | Reads Numbers Sheet 1 → attaches residents/next_residents to existing Supabase units; updates owner/area. Never creates new unit rows. After sync, diffs residents/next_residents and emails changes if Gmail env vars are set. | Scheduled + manual |
 | `sync-property-cache.mjs` | Reads Property Info Google Sheet → upserts Supabase units (property attributes) | Scheduled + manual |
 | `cleanup-duplicate-units.mjs` | Finds Supabase unit rows whose address doesn't match any Property Info sheet address and deletes them. Dry-run by default; pass `--confirm` to delete. | Manual only (after fixing address mismatches) |
 | `add-missing-properties.mjs` | One-time script used April 2026 to add 5 Howell St #1–9 and 203 E. Carr St to the Property Info sheet. Safe to re-run (skips existing rows). | Manual only |
@@ -184,6 +185,12 @@ Swimlane-style calendar for scheduling turnover work during May–August season.
 - Mobile polish (touch targets, full-screen modals, responsive week grid)
 
 ## Key Decisions (April 2026)
+
+### Sync Button + Change Email
+- **Sync button** in dashboard header (next to Export Turnovers) triggers the GitHub Actions `sync-numbers.yml` workflow via `POST /api/trigger-sync`. The `GITHUB_TOKEN` (actions:write scope) lives in Netlify env vars — never in the browser.
+- Button states: Idle → Syncing… → ✓ Triggered (green, 3s) or ✗ Failed (red, 3s). Note: GHA takes ~60–90s to finish after dispatch is accepted.
+- **Change summary email**: After each sync, `sync-from-numbers.mjs` snapshots residents/next_residents before the delete-and-reinsert, diffs after, and emails changes (adds, removes, status/lease/deposit flips, next resident changes) to `MEETING_EMAIL_TO` via nodemailer/Gmail. No changes = no email. Missing Gmail env vars = silently skipped.
+- Email env vars: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `MEETING_EMAIL_TO` — same credentials as `scripts/meeting-capture/`.
 
 ### Notes Migrated to Supabase
 - Notes were previously stored in browser `localStorage` (key `mills_notes`). Now stored in Supabase `notes` table, shared across users/devices.
@@ -264,3 +271,7 @@ npx netlify dev  # Runs on port 8888, proxies /api to Netlify functions
 - `SUPABASE_SERVICE_KEY` — Supabase service role key (never commit this)
 - `GOOGLE_SERVICE_ACCOUNT_JSON` — Google service account credentials (for Property Info sheet)
 - `SHEET_ID_PROPERTY_INFO` — Google Sheet ID for property info + inspections
+- `GITHUB_TOKEN` — GitHub PAT with `actions:write` scope (Netlify env var, used by `trigger-sync.js`)
+- `GMAIL_USER` — Gmail address for sending change summary emails (optional)
+- `GMAIL_APP_PASSWORD` — Gmail app password (optional)
+- `MEETING_EMAIL_TO` — Recipient address for sync change emails + meeting summaries (optional)

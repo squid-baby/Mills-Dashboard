@@ -195,8 +195,16 @@ if (unmatched.length > 0) {
   console.warn('  Fix: update the address in Amanda\'s Numbers file to match the Property Info sheet exactly.\n');
 }
 
-// Delete existing residents/next_residents for synced units
+// Snapshot residents + next_residents before deleting — used for change-detection email
 const syncedUnitIds = [...resolvedIds.values()];
+const [{ data: snapshotResidents }, { data: snapshotNextResidents }] = syncedUnitIds.length > 0
+  ? await Promise.all([
+      sb.from('residents').select('unit_id, name, status, lease_signed, deposit_paid').in('unit_id', syncedUnitIds),
+      sb.from('next_residents').select('unit_id, name, email, phone, move_in_date').in('unit_id', syncedUnitIds),
+    ])
+  : [{ data: [] }, { data: [] }];
+
+// Delete existing residents/next_residents for synced units
 if (syncedUnitIds.length > 0) {
   await sb.from('residents').delete().in('unit_id', syncedUnitIds);
   await sb.from('next_residents').delete().in('unit_id', syncedUnitIds);
@@ -286,3 +294,82 @@ ALTER TABLE next_residents ADD COLUMN IF NOT EXISTS move_in_date date;
 }
 
 console.log(`\n✓ Sync complete — ${resolvedIds.size} units matched, ${residentRows.length} residents, ${nextResidentRows.length} next residents`);
+
+// ─── Change detection + email ─────────────────────────────────────────────────
+// Only runs if GMAIL_USER + GMAIL_APP_PASSWORD + MEETING_EMAIL_TO are set.
+// Safe to skip — missing env vars = no email, no error.
+
+const GMAIL_USER = process.env.GMAIL_USER;
+const GMAIL_PASS = process.env.GMAIL_APP_PASSWORD;
+const EMAIL_TO   = process.env.MEETING_EMAIL_TO;
+
+if (GMAIL_USER && GMAIL_PASS && EMAIL_TO) {
+  // Fetch freshly-inserted data for diffing
+  const [{ data: newResidents }, { data: newNextResidents }] = await Promise.all([
+    sb.from('residents').select('unit_id, name, status, lease_signed, deposit_paid').in('unit_id', syncedUnitIds),
+    sb.from('next_residents').select('unit_id, name, email, phone, move_in_date').in('unit_id', syncedUnitIds),
+  ]);
+
+  const changes = [];
+
+  // --- Residents diff ---
+  const prevMap  = Object.fromEntries((snapshotResidents || []).map(r => [`${r.unit_id}:${r.name}`, r]));
+  const afterMap = Object.fromEntries((newResidents || []).map(r => [`${r.unit_id}:${r.name}`, r]));
+
+  for (const [key, r] of Object.entries(afterMap)) {
+    if (!prevMap[key]) changes.push(`+ Added resident: ${r.name}`);
+  }
+  for (const [key, r] of Object.entries(prevMap)) {
+    if (!afterMap[key]) changes.push(`- Removed resident: ${r.name}`);
+  }
+  for (const [key, after] of Object.entries(afterMap)) {
+    const before = prevMap[key];
+    if (!before) continue;
+    if (before.status !== after.status)
+      changes.push(`~ ${after.name}: status ${before.status} → ${after.status}`);
+    if (before.lease_signed !== after.lease_signed)
+      changes.push(`~ ${after.name}: lease_signed → ${after.lease_signed}`);
+    if (before.deposit_paid !== after.deposit_paid)
+      changes.push(`~ ${after.name}: deposit_paid → ${after.deposit_paid}`);
+  }
+
+  // --- Next residents diff ---
+  const prevNext  = Object.fromEntries((snapshotNextResidents || []).map(r => [`${r.unit_id}:${r.name}`, r]));
+  const afterNext = Object.fromEntries((newNextResidents || []).map(r => [`${r.unit_id}:${r.name}`, r]));
+
+  for (const [key, r] of Object.entries(afterNext)) {
+    if (!prevNext[key]) changes.push(`+ Added next resident: ${r.name}`);
+  }
+  for (const [key, r] of Object.entries(prevNext)) {
+    if (!afterNext[key]) changes.push(`- Removed next resident: ${r.name}`);
+  }
+  for (const [key, after] of Object.entries(afterNext)) {
+    const before = prevNext[key];
+    if (!before) continue;
+    if (before.move_in_date !== after.move_in_date)
+      changes.push(`~ ${after.name}: move_in_date ${before.move_in_date} → ${after.move_in_date}`);
+  }
+
+  if (changes.length > 0) {
+    const { createTransport } = await import('nodemailer');
+    const transporter = createTransport({
+      service: 'gmail',
+      auth: { user: GMAIL_USER, pass: GMAIL_PASS },
+    });
+    await transporter.sendMail({
+      from: GMAIL_USER,
+      to: EMAIL_TO,
+      subject: `Mills Sync — ${changes.length} change${changes.length !== 1 ? 's' : ''} (${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`,
+      text: [
+        `Numbers sync ran at ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })} ET`,
+        '',
+        ...changes,
+        '',
+        `${resolvedIds.size} units matched · ${residentRows.length} residents · ${nextResidentRows.length} next residents`,
+      ].join('\n'),
+    });
+    console.log(`  ✉ Change email sent (${changes.length} changes)`);
+  } else {
+    console.log('  ✉ No changes — skipping email');
+  }
+}

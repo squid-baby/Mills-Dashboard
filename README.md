@@ -185,7 +185,7 @@ node --env-file=.env scripts/sync-from-numbers.mjs
 5. Deletes and re-inserts residents and next_residents for synced units
 6. Reports counts when done
 
-**This runs automatically** via a Claude Code scheduled task, but can also be triggered manually.
+**This runs automatically** via a Claude Code scheduled task or GitHub Actions, and can also be triggered manually from the dashboard's Sync button (see below).
 
 **Requires:**
 - `/Volumes/One Touch/` must be mounted (external drive connected)
@@ -241,17 +241,18 @@ Click any tile to see:
 - Current residents with status badges, email, phone, copy buttons
 - Next year residents with contact info
 - Spreadsheet notes
+- Dashboard notes (stored in Supabase, shared across all users/devices)
 
 **Property Info tab:**
 - Editable property fields pulled from Google Sheet
 - Edit any field inline - changes save to Google Sheet with history
-- Quick notes with timestamps
+- Appliance details: washer, dryer, dishwasher, fridge, stove (with replacement dates and warranty info)
 
 **Turnover tab** (only for turnover units):
 - Full inspection form (50+ items)
 - Replacement items tracking
 - Overall condition rating (Up to date / Needs love / At risk)
-- Condition dot shows on the tile in the main grid
+- Condition flag shows on the tile in the main grid
 
 ### Turnover Window
 
@@ -260,6 +261,29 @@ For units with turnovers, the dashboard calculates the work window between move-
 - **Red:** 7 days or fewer
 - **Amber:** 8-14 days
 - **Green:** 15+ days
+
+### Turnover Calendar
+
+Swimlane-style calendar (accessible from the "Calendar" button in the header) for scheduling turnover work during the May-August season:
+
+- **Month view:** Grid with colored task pills per day. Click a day to drill into it.
+- **Week view:** Swimlane layout with AM/PM slots per property.
+- **Day view:** Expanded task cards with full details.
+- **Task types:** Move Out, Paint, Repair, Clean, Finalize, Move In — each color-coded.
+- **Ghost tasks:** Auto-generated from lease data (move-out/move-in dates) for units missing those tasks. Confirm to save or dismiss for the session.
+- **Create/edit/delete** tasks from the calendar UI.
+
+### Light / Dark Mode
+
+Toggle between dark and light themes via the sun/moon button in the header. Persists to localStorage and respects system preference on first visit.
+
+### Sync Button
+
+The "↻ Sync" button in the header triggers the GitHub Actions sync workflow, which re-reads Amanda's Numbers file and pushes changes to Supabase. After each sync, if any resident data changed (adds, removes, status flips, lease/deposit changes), a summary email is sent to the team.
+
+### Export Turnovers
+
+The "Export Turnovers" button exports a CSV of all turnover units (filtered to your current view) with lease dates, turn window, tenant info, inspection details, and notes.
 
 ---
 
@@ -277,8 +301,16 @@ For units with turnovers, the dashboard calculates the work window between move-
     save-inspection.js                          #   Dashboard -> inspection data
     get-inspection.js                           #   Inspection data -> dashboard
     get-all-inspections.js                      #   All inspection summaries
+    get-notes.js                                #   Supabase notes -> dashboard
+    save-note.js                                #   Dashboard -> Supabase notes
+    get-calendar-tasks.js                       #   Calendar tasks by date range
+    save-calendar-task.js                       #   Create/update calendar task
+    delete-calendar-task.js                     #   Delete calendar task
+    trigger-sync.js                             #   Dispatch GitHub Actions sync workflow
   scripts/
     sync-from-numbers.mjs                       #   Numbers file -> Supabase sync
+    sync-property-cache.mjs                     #   Google Sheet -> Supabase property attrs
+    meeting-capture/                            #   Meeting recording + transcription + email
   .env                                          # Credentials (never committed)
 ```
 
@@ -377,9 +409,13 @@ Then update the `S1` constants in `scripts/sync-from-numbers.mjs`.
 | `SUPABASE_SERVICE_KEY` | Sync script + Netlify functions | Supabase service role key (secret!) |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Netlify functions | Google service account credentials JSON |
 | `SHEET_ID_PROPERTY_INFO` | Netlify functions | Google Sheet ID for property info |
+| `GITHUB_TOKEN` | Netlify function (`trigger-sync.js`) | GitHub PAT with `actions:write` scope |
+| `GMAIL_USER` | Sync script (change email) | Gmail address for sending change summaries |
+| `GMAIL_APP_PASSWORD` | Sync script (change email) | Gmail app password |
+| `MEETING_EMAIL_TO` | Sync script + meeting capture | Recipient for change emails and meeting notes |
 
 **Local:** Stored in `/Users/millsrentals/Mills-Dashboard/.env` (gitignored)
-**Production:** Set in Netlify dashboard under Site settings > Environment variables
+**Production:** Set in Netlify dashboard (Site settings > Environment variables) and GitHub Actions secrets
 
 ---
 
