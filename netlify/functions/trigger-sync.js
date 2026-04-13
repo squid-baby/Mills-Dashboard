@@ -1,11 +1,15 @@
 // Dispatches the sync-numbers.yml workflow via GitHub API workflow_dispatch.
 // GITHUB_TOKEN must be set in Netlify env vars (actions:write scope).
 
-export default async (req) => {
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+export async function handler(event) {
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, body: 'Method not allowed' };
+  }
 
   const token = process.env.GITHUB_TOKEN;
-  if (!token) return new Response('GITHUB_TOKEN not configured', { status: 500 });
+  if (!token) {
+    return { statusCode: 500, body: JSON.stringify({ ok: false, message: 'GITHUB_TOKEN not configured' }) };
+  }
 
   const res = await fetch(
     'https://api.github.com/repos/squid-baby/Mills-Dashboard/actions/workflows/sync-numbers.yml/dispatches',
@@ -21,10 +25,8 @@ export default async (req) => {
   );
 
   if (res.status === 204) {
-    return Response.json({ ok: true, message: 'Sync triggered' });
+    return { statusCode: 200, body: JSON.stringify({ ok: true, message: 'Sync triggered' }) };
   }
   const body = await res.text();
-  return Response.json({ ok: false, message: body }, { status: 502 });
-};
-
-export const config = { path: '/api/trigger-sync' };
+  return { statusCode: 502, body: JSON.stringify({ ok: false, message: body }) };
+}
