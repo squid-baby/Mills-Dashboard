@@ -20,24 +20,24 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   process.exit(1);
 }
 
-// ─── Column indices (updated for new Numbers layout) ─────────────────────────
+// ─── Column indices (updated April 2026 — Move Out moved to col 8, new col 13 inserted) ─
 const S1 = {
   PROPERTY:     0,
   RESIDENT:     1,
   EMAIL:        2,
-  PHONE:        3,  // NEW
-  LEASE_END:    4,  // was 3
-  MOVE_OUT:     5,  // NEW
-  STATUS:       6,
-  LEASE_SIGNED: 7,
-  DEPOSIT_PAID: 8,
+  PHONE:        3,
+  LEASE_END:    4,
+  STATUS:       5,  // was 6
+  LEASE_SIGNED: 6,  // was 7
+  DEPOSIT_PAID: 7,  // was 8
+  MOVE_OUT:     8,  // was 5 (col moved; "Next year's lease end date" inserted at 13)
   NOTES:        9,
   NEXT_RESIDENT:10,
   NEXT_EMAIL:   11,
   NEXT_PHONE:   12,
-  NEXT_MOVE_IN: 13, // NEW (Next Residents Move In Date)
-  OWNER:        17, // was 16
-  AREA:         18, // was 17
+  NEXT_MOVE_IN: 14, // was 13 (shifted by new col 13 "Next year's lease end date")
+  OWNER:        17,
+  AREA:         18,
 };
 
 // S2 (Sheet 2 / property info) removed — property attributes now owned by
@@ -93,7 +93,10 @@ function parseDate(val) {
 }
 
 // ─── Export from Numbers via numbers-parser (Python) ─────────────────────────
-const NUMBERS_FILE = '/Volumes/One Touch/The_Team_Google_Drive Sync/2025-2026 Renewals_Dashboard.numbers';
+// NUMBERS_FILE env var allows cloud runners (GitHub Actions) to pass a downloaded path.
+// Falls back to the local Google Drive mount for Mac Mini scheduled runs.
+const NUMBERS_FILE = process.env.NUMBERS_FILE
+  || '/Volumes/One Touch/The_Team_Google_Drive Sync/2025-2026 Renewals_Dashboard.numbers';
 const EXPORT_DIR = '/tmp/mills_export';
 
 function exportFromNumbers() {
