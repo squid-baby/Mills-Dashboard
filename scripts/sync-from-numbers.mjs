@@ -51,6 +51,13 @@ function normalizeAddr(addr) {
   return (addr || '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
+// Strip common street suffixes for fuzzy matching.
+// "230 Valley Park Dr" → "230 valley park", "110 Fidelity St" → "110 fidelity"
+const STREET_SUFFIXES = /\s+(dr|st|rd|ave|blvd|ct|ln|cir|way|pl)\.?$/i;
+function stripSuffix(addr) {
+  return normalizeAddr(addr).replace(STREET_SUFFIXES, '');
+}
+
 function parseCSV(text) {
   const rows = [];
   for (const line of text.split('\n')) {
@@ -159,16 +166,24 @@ console.log(`\nFound ${groups.size} units in Sheet1`);
 const { data: unitData, error: fetchErr } = await sb.from('units').select('id, address, owner_name, area');
 if (fetchErr) { console.error('fetch units failed:', fetchErr.message); process.exit(1); }
 
-// Build two lookup maps: exact address → id, and normalized address → id
+// Build three lookup maps: exact → id, normalized → id, suffix-stripped → id
 const unitIdMap = Object.fromEntries(unitData.map(u => [u.address, u.id]));
 const normalizedIdMap = Object.fromEntries(unitData.map(u => [normalizeAddr(u.address), u.id]));
+const strippedIdMap = Object.fromEntries(unitData.map(u => [stripSuffix(u.address), u.id]));
+
+// Three-tier address resolver: exact → normalized → suffix-stripped
+function resolveUnitId(address) {
+  return unitIdMap[address]
+    ?? normalizedIdMap[normalizeAddr(address)]
+    ?? strippedIdMap[stripSuffix(address)];
+}
 
 // Update owner_name and area for matched units (these come from the Numbers file)
 const ownerUpdates = [];
 for (const [address, rows] of groups) {
   const owner = rows.map(r => clean(r[S1.OWNER])).find(v => v) || '';
   const area  = rows.map(r => clean(r[S1.AREA])).find(v => v) || '';
-  const id = unitIdMap[address] ?? normalizedIdMap[normalizeAddr(address)];
+  const id = resolveUnitId(address);
   if (id && (owner || area)) ownerUpdates.push({ id, owner_name: owner || undefined, area: area || undefined });
 }
 if (ownerUpdates.length > 0) {
@@ -178,11 +193,11 @@ if (ownerUpdates.length > 0) {
   console.log(`  ✓ Updated owner/area for ${ownerUpdates.length} units`);
 }
 
-// Resolve Numbers addresses to existing Supabase unit IDs (normalized matching)
+// Resolve Numbers addresses to existing Supabase unit IDs (three-tier matching)
 const unmatched = [];
 const resolvedIds = new Map(); // Numbers address → Supabase unit id
 for (const address of groups.keys()) {
-  const id = unitIdMap[address] ?? normalizedIdMap[normalizeAddr(address)];
+  const id = resolveUnitId(address);
   if (id) {
     resolvedIds.set(address, id);
   } else {
