@@ -238,11 +238,12 @@ export function parseSheets(sheet1Rows, sheet2Rows) {
     const info = propInfo[address] || {};
     const beds = info.beds || '';
 
+    const hasNonLeaving = residents.some(r => r.status !== 'leaving');
     const allSigned = residents.length > 0 && residents.every(r =>
-      r.status === 'leaving' || r.leaseSigned
+      (hasNonLeaving && r.status === 'leaving') || r.leaseSigned
     );
     const allDeposit = residents.length > 0 && residents.every(r =>
-      r.status === 'leaving' || r.depositPaid
+      (hasNonLeaving && r.status === 'leaving') || r.depositPaid
     );
 
     units.push({

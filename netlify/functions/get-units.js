@@ -87,8 +87,9 @@ function buildUnit(row, id) {
   const notes       = [...new Set(residents.map(r => r.notes).filter(Boolean))].join('; ');
   const group       = deriveGroup(residents, nextResidents);
   const substate    = deriveSubstate(group, residents, nextResidents);
-  const allSigned   = residents.length > 0 && residents.every(r => r.status === 'leaving' || r.leaseSigned);
-  const allDeposit  = residents.length > 0 && residents.every(r => r.status === 'leaving' || r.depositPaid);
+  const hasNonLeaving = residents.some(r => r.status !== 'leaving');
+  const allSigned   = residents.length > 0 && residents.every(r => (hasNonLeaving && r.status === 'leaving') || r.leaseSigned);
+  const allDeposit  = residents.length > 0 && residents.every(r => (hasNonLeaving && r.status === 'leaving') || r.depositPaid);
 
   return {
     id,
