@@ -45,10 +45,10 @@ const S1 = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-// Normalize addresses for matching: lowercase, collapse spaces, trim.
-// "207 B Oak Ave" and "207 B Oak ave" → "207 b oak ave"
+// Normalize addresses for matching: lowercase, strip periods, collapse spaces, trim.
+// "201 E. Carr St" and "201 E Carr St" → "201 e carr st"
 function normalizeAddr(addr) {
-  return (addr || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  return (addr || '').toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ').trim();
 }
 
 // Strip common street suffixes for fuzzy matching.

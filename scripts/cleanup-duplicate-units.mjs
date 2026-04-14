@@ -37,7 +37,16 @@ const credentials = JSON.parse(GOOGLE_SERVICE_ACCOUNT_JSON);
 const auth = new google.auth.GoogleAuth({ credentials, scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] });
 const sheets = google.sheets({ version: 'v4', auth });
 
-const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID_PROPERTY_INFO, range: 'property info!A:A' });
+// Discover the property-info tab name dynamically
+const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID_PROPERTY_INFO, fields: 'sheets.properties.title' });
+const allTabs = meta.data.sheets.map(s => s.properties.title);
+// Find the property-info tab (not Tenant Info, not History, not Inspections)
+const tabName = allTabs.find(t => /property.?info|info.?clean/i.test(t))
+  || allTabs.find(t => !/tenant|history|inspection|turnover/i.test(t))
+  || allTabs[0];
+console.log(`Using sheet tab: "${tabName}" (available: ${allTabs.join(', ')})`);
+
+const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID_PROPERTY_INFO, range: `'${tabName}'!A:A` });
 const sheetRows = res.data.values || [];
 const sheetAddresses = new Set(
   sheetRows.slice(1).map(r => normalizeAddr(r[0])).filter(Boolean)
