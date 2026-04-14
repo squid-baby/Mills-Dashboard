@@ -113,9 +113,9 @@ export function deriveGroup(residents, nextResidents) {
 function deriveSubstate(group, residents, nextResidents) {
   switch (group) {
     case 'full_turnover':
-      return 'Needs to be listed';
+      return 'Needs to be Rented';
     case 'turnover_rented':
-      return nextResidents.every(r => r.name) ? 'New tenant found, lease in progress' : 'Needs to be listed';
+      return nextResidents.every(r => r.name) ? 'New tenant found, lease in progress' : 'Needs to be Rented';
     case 'renewed':
       return 'Renewal signed';
     case 'renewing': {

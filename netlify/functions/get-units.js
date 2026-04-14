@@ -166,8 +166,8 @@ function deriveGroup(residents, nextResidents) {
 
 function deriveSubstate(group, residents, nextResidents) {
   switch (group) {
-    case 'full_turnover':       return 'Needs to be listed';
-    case 'turnover_rented':     return nextResidents.every(r => r.name) ? 'New tenant found, lease in progress' : 'Needs to be listed';
+    case 'full_turnover':       return 'Needs to be Rented';
+    case 'turnover_rented':     return nextResidents.every(r => r.name) ? 'New tenant found, lease in progress' : 'Needs to be Rented';
     case 'renewed':             return 'Renewal signed';
     case 'renewing':            return residents.some(r => r.status === 'renewing' && r.leaseSigned) ? 'Renewal lease sent, not all signed' : 'Interested, lease not yet sent';
     case 'partial_turn':        return 'Partial turn - some staying, some leaving';
