@@ -22,7 +22,7 @@ Tenant domain (read-only):
 Property domain (read-write):
   Google Sheet edited by team / seeded by seed-units-from-csv.mjs
     → Scheduled task: node scripts/sync-property-cache.mjs
-        → Reads "property info" Google Sheet tab
+        → Reads "property-info-clean" Google Sheet tab
         → Upserts property attributes (beds, baths, ac_type, etc.) into Supabase units
 
   → Dashboard calls /api/get-units → Netlify function queries Supabase → renders data
@@ -34,14 +34,9 @@ Property domain (read-write):
 
 **Key gotcha (fixed March 2026):** `get-units.js` was originally reading from Google Sheets, not Supabase. It now queries Supabase directly. If the dashboard shows "Local data" instead of "Synced", the Netlify function is failing — check Netlify function logs.
 
-**Key gotcha (fixed April 2026):** `sync-from-numbers.mjs` used to upsert new `units` rows directly from Amanda's Numbers file, causing duplicate tiles when addresses didn't match exactly between the two sources. It now fetches existing Supabase units first and only attaches residents to matched units — it never creates new unit rows. The Property Info Google Sheet is the authoritative source of what units exist. Address matching is case-insensitive and whitespace-normalized. Unmatched Numbers addresses are logged as warnings.
+**Key gotcha (fixed April 2026):** `sync-from-numbers.mjs` used to upsert new `units` rows directly from Amanda's Numbers file, causing duplicate tiles when addresses didn't match exactly between the two sources. It now fetches existing Supabase units first and only attaches residents to matched units — it never creates new unit rows. The Property Info Google Sheet is the authoritative source of what units exist. Address matching is three-tier: exact → normalized (lowercase, strip periods, collapse spaces) → suffix-stripped (removes trailing St/Dr/Ave/etc.). Unmatched Numbers addresses are logged as warnings.
 
-**Pending address mismatches (April 2026):** These addresses in Amanda's Numbers file don't match the Property Info sheet and will log warnings on sync until fixed:
-- `"230–246 Valley Park"` → should be `"230–246 Valley Park Dr"`
-- `"301 A/B/C/D Pleasant St"` / `"301 Pleasant St House"` → should drop "St" (e.g. `"301 A Pleasant"`)
-- `"110 Fidelity"` → should be `"110 Fidelity St"`
-- `"207 Oak Ave"` → should be `"207 A Oak Ave"`
-Until fixed, those properties will have orphan unit rows in Supabase with no property info. Run `cleanup-duplicate-units.mjs` after fixing to remove them.
+**Duplicate cleanup (April 2026):** 26 orphan duplicate unit rows were cleaned up — these were address variants (e.g. "230 Valley Park" vs "230 Valley Park Dr", "201 E. Carr St" vs "201 E Carr St") left over from before the suffix-aware matching was added. `cleanup-duplicate-units.mjs` dynamically discovers the Google Sheet tab name (currently "property-info-clean") to avoid breakage if the tab is renamed again.
 
 ### Supabase Schema
 - `units` — one row per property (address, beds, baths, area, owner_name, utilities, property_type, sq_ft, freeze_warning, pets_allowed, year_built, town, washer, dryer, dishwasher, gas, sump_pump, breaker_box, ac_type, heat_type, sheet_notes)
