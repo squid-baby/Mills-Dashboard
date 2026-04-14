@@ -1,7 +1,7 @@
 /**
  * Netlify Function: POST /api/update-property-info
  *
- * Updates a single field in the "property info" Google Sheet and appends
+ * Updates a single field in the "property-info-clean" Google Sheet tab and appends
  * a row to the "Property Info History" tab (if it exists).
  *
  * Body: { address, field, oldValue, value, by }
@@ -12,7 +12,7 @@
  */
 
 import { google } from 'googleapis';
-import { FIELD_TO_HEADER } from '../../src/config/columns.js';
+import { FIELD_TO_HEADER, SHEET_TABS } from '../../src/config/columns.js';
 
 const SENSITIVE_FIELDS = ['door_code', 'alarm_code'];
 
@@ -58,7 +58,7 @@ export async function handler(event) {
     // Read header row + address column to find row and column positions
     const headerRes = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID_PROPERTY_INFO,
-      range: 'property info!A1:AZ1',
+      range: `${SHEET_TABS.PROPERTY_INFO}!A1:AZ1`,
     });
     const headers = headerRes.data.values?.[0] || [];
 
@@ -73,7 +73,7 @@ export async function handler(event) {
     const addrColIdx = headers.findIndex(h => h === 'Property');
     const addrRes = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID_PROPERTY_INFO,
-      range: `property info!${colLetter(addrColIdx)}:${colLetter(addrColIdx)}`,
+      range: `${SHEET_TABS.PROPERTY_INFO}!${colLetter(addrColIdx)}:${colLetter(addrColIdx)}`,
     });
     const addrRows = addrRes.data.values || [];
     let rowIndex = -1;
@@ -91,7 +91,7 @@ export async function handler(event) {
       newRow[fieldColIdx] = value || '';
       await sheets.spreadsheets.values.append({
         spreadsheetId: SHEET_ID_PROPERTY_INFO,
-        range: 'property info!A:A',
+        range: `${SHEET_TABS.PROPERTY_INFO}!A:A`,
         valueInputOption: 'USER_ENTERED',
         requestBody: { values: [newRow] },
       });
@@ -99,7 +99,7 @@ export async function handler(event) {
       // Update the specific cell
       await sheets.spreadsheets.values.update({
         spreadsheetId: SHEET_ID_PROPERTY_INFO,
-        range: `property info!${colLetter(fieldColIdx)}${rowIndex}`,
+        range: `${SHEET_TABS.PROPERTY_INFO}!${colLetter(fieldColIdx)}${rowIndex}`,
         valueInputOption: 'USER_ENTERED',
         requestBody: { values: [[value || '']] },
       });
@@ -109,7 +109,7 @@ export async function handler(event) {
     try {
       await sheets.spreadsheets.values.append({
         spreadsheetId: SHEET_ID_PROPERTY_INFO,
-        range: 'Property Info History!A:F',
+        range: `${SHEET_TABS.HISTORY}!A:F`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [[new Date().toISOString(), address, field, oldValue || '', value || '', by || 'Dashboard']],

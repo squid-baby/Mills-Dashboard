@@ -173,3 +173,10 @@ export const NEW_SHEET_COLUMNS = [
   'Pets Allowed',
   'Sheet Notes',
 ];
+
+// ─── Google Sheet tab names (single source of truth) ────────────────────────
+export const SHEET_TABS = {
+  PROPERTY_INFO: 'property-info-clean',
+  HISTORY: 'Property Info History',
+  INSPECTIONS: 'Turnover Inspections',
+};

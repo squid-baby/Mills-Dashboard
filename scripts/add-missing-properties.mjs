@@ -53,7 +53,7 @@ const sheets = google.sheets({ version: 'v4', auth });
 
 const res = await sheets.spreadsheets.values.get({
   spreadsheetId: SHEET_ID_PROPERTY_INFO,
-  range: 'property info!A1:AZ1',
+  range: 'property-info-clean!A1:AZ1',
 });
 const headers = (res.data.values?.[0] || []).map(h => h.trim());
 console.log(`Sheet has ${headers.length} columns`);
@@ -64,7 +64,7 @@ const hIdx = Object.fromEntries(headers.map((h, i) => [h, i]));
 // Check which addresses already exist in the sheet
 const existingRes = await sheets.spreadsheets.values.get({
   spreadsheetId: SHEET_ID_PROPERTY_INFO,
-  range: 'property info!A:A',
+  range: 'property-info-clean!A:A',
 });
 const existingAddrs = new Set(
   (existingRes.data.values || []).slice(1).map(r => (r[0] || '').trim().toLowerCase())
@@ -158,7 +158,7 @@ if (DRY_RUN) {
 const values = rowsToAppend.map(({ row }) => row);
 await sheets.spreadsheets.values.append({
   spreadsheetId: SHEET_ID_PROPERTY_INFO,
-  range: 'property info!A:A',
+  range: 'property-info-clean!A:A',
   valueInputOption: 'USER_ENTERED',
   insertDataOption: 'INSERT_ROWS',
   requestBody: { values },

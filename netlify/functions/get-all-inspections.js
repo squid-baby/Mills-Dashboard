@@ -10,8 +10,9 @@
  */
 
 import { google } from 'googleapis';
+import { SHEET_TABS } from '../../src/config/columns.js';
 
-const TAB_NAME = 'Turnover Inspections';
+const TAB_NAME = SHEET_TABS.INSPECTIONS;
 
 export async function handler() {
   const { GOOGLE_SERVICE_ACCOUNT_JSON, SHEET_ID_PROPERTY_INFO } = process.env;

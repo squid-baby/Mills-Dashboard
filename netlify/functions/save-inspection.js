@@ -15,8 +15,9 @@
  */
 
 import { google } from 'googleapis';
+import { SHEET_TABS } from '../../src/config/columns.js';
 
-const TAB_NAME = 'Turnover Inspections';
+const TAB_NAME = SHEET_TABS.INSPECTIONS;
 
 export async function handler(event) {
   if (event.httpMethod !== 'POST') {

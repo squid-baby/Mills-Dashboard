@@ -18,7 +18,7 @@
 import { google } from 'googleapis';
 import { mkdirSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
-import { NEW_SHEET_COLUMNS } from '../src/config/columns.js';
+import { NEW_SHEET_COLUMNS, SHEET_TABS } from '../src/config/columns.js';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const NUMBERS_FILE = '/Volumes/One Touch/The_Team_Google_Drive Sync/2025-2026 Renewals_Dashboard.numbers';
@@ -175,11 +175,11 @@ console.log('\nReading Property Info Google Sheet...');
 const [headerRes, addrRes] = await Promise.all([
   sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID_PROPERTY_INFO,
-    range: 'property info!A1:AZ1',
+    range: `${SHEET_TABS.PROPERTY_INFO}!A1:AZ1',
   }),
   sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID_PROPERTY_INFO,
-    range: 'property info!A:A',
+    range: `${SHEET_TABS.PROPERTY_INFO}!A:A',
   }),
 ]);
 
@@ -204,7 +204,7 @@ if (missingHeaders.length > 0) {
     const startCol = colLetter(gsheetHeaders.length);
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID_PROPERTY_INFO,
-      range: `property info!${startCol}1`,
+      range: `${SHEET_TABS.PROPERTY_INFO}!${startCol}1`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [missingHeaders] },
     });
@@ -251,7 +251,7 @@ for (const [address, entry] of propData) {
   } else {
     // Use batchUpdate to write all cells for this property in one call
     const batchData = writes.map(({ col, value }) => ({
-      range: `property info!${colLetter(col)}${rowIndex}`,
+      range: `${SHEET_TABS.PROPERTY_INFO}!${colLetter(col)}${rowIndex}`,
       values: [[value]],
     }));
     await sheets.spreadsheets.values.batchUpdate({

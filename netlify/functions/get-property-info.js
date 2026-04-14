@@ -1,8 +1,8 @@
 /**
  * Netlify Function: GET /api/get-property-info?address=...
  *
- * Reads the "property info" Google Sheet for a given address and returns
- * all mapped fields plus recent history entries.
+ * Reads the "property-info-clean" Google Sheet tab for a given address
+ * and returns all mapped fields plus recent history entries.
  *
  * Required env vars:
  *   GOOGLE_SERVICE_ACCOUNT_JSON - full JSON key for the service account
@@ -10,7 +10,7 @@
  */
 
 import { google } from 'googleapis';
-import { HEADER_TO_FIELD } from '../../src/config/columns.js';
+import { HEADER_TO_FIELD, SHEET_TABS } from '../../src/config/columns.js';
 
 export async function handler(event) {
   const address = event.queryStringParameters?.address;
@@ -40,11 +40,11 @@ export async function handler(event) {
     const [infoRes, historyRes] = await Promise.allSettled([
       sheets.spreadsheets.values.get({
         spreadsheetId: SHEET_ID_PROPERTY_INFO,
-        range: 'property info!A:AZ',
+        range: `${SHEET_TABS.PROPERTY_INFO}!A:AZ`,
       }),
       sheets.spreadsheets.values.get({
         spreadsheetId: SHEET_ID_PROPERTY_INFO,
-        range: 'Property Info History!A:F',
+        range: `${SHEET_TABS.HISTORY}!A:F`,
       }),
     ]);
 

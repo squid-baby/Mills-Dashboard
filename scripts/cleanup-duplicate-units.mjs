@@ -29,7 +29,7 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !GOOGLE_SERVICE_ACCOUNT_JSON || !S
 }
 
 function normalizeAddr(addr) {
-  return (addr || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  return (addr || '').toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ').trim();
 }
 
 // ── Fetch Property Info sheet addresses (canonical source of truth) ──────────

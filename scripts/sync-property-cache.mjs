@@ -1,7 +1,7 @@
 /**
  * sync-property-cache.mjs — Property attribute sync (Google Sheet → Supabase)
  *
- * Reads the "property info" tab of the Property Info Google Sheet and upserts
+ * Reads the "property-info-clean" tab of the Property Info Google Sheet and upserts
  * structural property attributes into the Supabase `units` table.
  *
  * Run alongside sync-from-numbers.mjs on a schedule, or manually after editing
@@ -21,7 +21,7 @@
 
 import { google } from 'googleapis';
 import { createClient } from '@supabase/supabase-js';
-import { HEADER_TO_FIELD } from '../src/config/columns.js';
+import { HEADER_TO_FIELD, SHEET_TABS } from '../src/config/columns.js';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 
@@ -71,7 +71,7 @@ const sheets = google.sheets({ version: 'v4', auth });
 
 const res = await sheets.spreadsheets.values.get({
   spreadsheetId: SHEET_ID_PROPERTY_INFO,
-  range: 'property info!A:AZ',
+  range: `${SHEET_TABS.PROPERTY_INFO}!A:AZ`,
 });
 
 const allRows = res.data.values || [];
