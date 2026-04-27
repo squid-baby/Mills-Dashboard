@@ -116,7 +116,8 @@ if (!transcript) {
   log('ERROR: Empty transcript — aborting.');
   process.exit(1);
 }
-log(`Transcript: ${transcript.split('\n').length} speaker segments`);
+const speakerLabels = [...new Set(transcript.match(/^SPEAKER_\d+/gm) ?? [])];
+log(`Transcript: ${transcript.split('\n').length} speaker segments, ${speakerLabels.length} distinct speakers (${speakerLabels.join(', ') || 'none — diarization off'})`);
 
 // Step 2: Fetch all unit addresses
 log('Fetching unit addresses from Supabase...');
@@ -191,34 +192,57 @@ for (const address of (matchResult.matched ?? [])) {
 log('Calling Claude to write email body...');
 const emailMsg = await anthropic.messages.create({
   model: 'claude-opus-4-6',
-  max_tokens: 4096,
+  max_tokens: 6000,
   messages: [{
     role: 'user',
     content: `You are a property management assistant writing meeting notes for the Mills Rentals team.
 
+REGULAR ATTENDEES: Nathan, Amanda, Andrea. Others may also be present.
+
+SPEAKER IDENTIFICATION: The transcript labels speakers as SPEAKER_00, SPEAKER_01, etc. Before writing anything, silently identify which speaker label belongs to which person. Use context clues: people address each other by name, use first person ("I'll email..."), reference their own responsibilities (Amanda manages the Numbers file/renewals, Nathan handles tech/dashboard, Andrea handles operations/vendor coordination). If you can't confidently identify a speaker, use "Unknown" — never guess. Carry these name mappings through the entire document.
+
 Write the email as clean HTML. No <html>/<head>/<body> tags — just the inner content. Use inline styles sparingly. Follow this structure exactly:
 
+<!-- ── ACTION ITEMS ─────────────────────────────────────────────── -->
+<h2 style="font-family:sans-serif;border-bottom:2px solid #e44;padding-bottom:6px;color:#c00;">✅ Action Items</h2>
+<ul style="font-family:sans-serif;line-height:2;">
+  [One <li> per commitment or task. Format: <strong>Person</strong> → task description. Include deadline if mentioned. Examples:]
+  <li><strong>Andrea</strong> → Email Grace about the insurance certificate <em>(by end of month)</em></li>
+  <li><strong>Amanda</strong> → Update lease dates for 230 Valley Park after tenant confirms</li>
+  <li><strong>Nathan</strong> → Fix dashboard filter bug before Thursday showing</li>
+  [If no action items: <li style="color:#888;">None recorded</li>]
+</ul>
+
+<!-- ── GENERAL BUSINESS ───────────────────────────────────────────── -->
+<h2 style="font-family:sans-serif;border-bottom:2px solid #333;padding-bottom:6px;">General Business</h2>
+[Cover non-property topics: business process decisions, scheduling, vendor/insurance/legal items, team coordination, events, etc. Use subheadings if multiple topics. Be specific — capture names, dates, amounts, decisions. Omit this section only if truly nothing was discussed.]
+<div style="font-family:sans-serif;">
+  <p><strong>Topic name</strong></p>
+  <ul style="margin:4px 0 12px 20px;line-height:1.7;">
+    <li>Key fact or decision with attribution (e.g. "Amanda suggested July 30 at 4pm for the annual party")</li>
+  </ul>
+</div>
+
+<!-- ── PROPERTIES & TENANTS ──────────────────────────────────────── -->
 <h2 style="font-family:sans-serif;border-bottom:2px solid #333;padding-bottom:6px;">Properties & Tenants</h2>
 
 [For each matched property:]
 <div style="margin-bottom:20px;font-family:sans-serif;">
   <p style="margin:0 0 4px 0;"><strong>123 Example St</strong> &nbsp;<span style="color:#555;">(Resident Name — Status Label)</span></p>
   <ul style="margin:4px 0 6px 20px;padding:0;line-height:1.7;">
-    <li><strong>Move out:</strong> May 5, 2026</li>  [omit if not mentioned]
-    <li><strong>Move in:</strong> May 9, 2026</li>   [omit if not mentioned]
-    <li>Quick turn — 4 days</li>
-    <li>One bullet per key fact or action (paint-out needed, remove TV, AI photos ready, etc.)</li>
+    <li><strong>Move out:</strong> May 5, 2026</li>
+    <li><strong>Move in:</strong> May 9, 2026</li>
+    <li>One bullet per key fact or action discussed (paint needed, remove TV, photos ready, etc.)</li>
     <li><em>Condition unknown — needs inspection</em></li>  [only if condition not discussed]
   </ul>
   <p style="margin:0 0 4px 0;font-size:12px;color:#666;font-family:monospace;background:#f5f5f5;padding:4px 8px;border-radius:3px;"><strong>Dashboard:</strong> status=leaving &nbsp;|&nbsp; lease_end=2026-05-31 &nbsp;|&nbsp; next_move_in=TBD</p>
-  <p style="margin:4px 0 0 0;">✏️ &nbsp;<strong>One concise action line here</strong></p>
 </div>
 
+[If no properties matched: <p style="font-family:sans-serif;color:#888;">(No specific properties discussed)</p>]
+
+<!-- ── LOW CONFIDENCE ─────────────────────────────────────────────── -->
 <h2 style="font-family:sans-serif;border-bottom:2px solid #333;padding-bottom:6px;">Low Confidence (verify manually)</h2>
 [one line per item, or "<p style='font-family:sans-serif;color:#888;'>(none)</p>"]
-
-<h2 style="font-family:sans-serif;border-bottom:2px solid #333;padding-bottom:6px;">Meeting Minutes</h2>
-<p style="font-family:sans-serif;line-height:1.6;">[2-3 sentences max. Key decisions and action items only. No fluff.]</p>
 
 <p style="font-family:sans-serif;color:#888;font-size:12px;">Recorded: ${recordedAt}</p>
 
