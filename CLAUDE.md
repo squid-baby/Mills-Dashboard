@@ -5,36 +5,57 @@
 ## Architecture
 
 ### Data Sources
-- **Tenant/Renewal data**: Source of truth is Amanda's `.numbers` file at `/Volumes/One Touch/The_Team_Google_Drive Sync/2025-2026 Renewals_Dashboard.numbers` (Google Drive synced locally). The sync script reads this file directly using `numbers-parser` (Python), exports fresh CSVs to `/tmp/mills_export/`, then upserts into Supabase. Dashboard reads from Supabase — **read-only**.
-- **Property Info**: Google Sheet (`SHEET_ID_PROPERTY_INFO`). Dashboard has **read/write** access via service account.
-- **Turnover Inspections**: Stored in "Turnover Inspections" tab of the Property Info Google Sheet. Written by `save-inspection.js`, read by `get-inspection.js` and `get-all-inspections.js`.
-- **Property Info History**: Stored in "Property Info History" tab. Appended on every property field edit.
+**Single source of truth:** the **Neo Google Sheet** ("Mills Dashboad - Neo", env `SHEET_ID_PROPERTY_INFO`). Three tabs feed the dashboard:
+
+| Tab | Used for | Sync direction |
+|---|---|---|
+| `Tenant Info` | Residents, next residents, lease/move dates | **Read-only by sync** (residents + next_residents replace per matched unit) |
+| `property-info-clean` | All unit attributes (beds, owner, codes, appliances, paint, etc.) | **Read by sync** (upserts units); **read/write by dashboard** via `get-property-info` / `update-property-info` |
+| `Turnover Inspections` | Inspection records | Written by `save-inspection.js`; read by `get-inspection.js`, `get-all-inspections.js`. **Phase B (deferred):** convert writes to append-only. |
+| `Property Info History` | Audit log | Appended on every property field edit by `update-property-info.js` |
+
+Amanda's `.numbers` file is now a **frozen Drive backup**, no longer read by anything. To roll back the migration, `git revert` the cutover commits and restore the deleted scripts from history.
 
 ### Sync Pipeline
 ```
-Tenant domain (read-only):
-  Amanda edits .numbers file (on Google Drive)
-    → Google Drive syncs to /Volumes/One Touch/...
-    → Scheduled task: node scripts/sync-from-numbers.mjs
-        → numbers-parser reads Sheet 1 only → exports 2025-26 renewals.csv
-        → Upserts units (address/owner/area only), residents, next_residents into Supabase
+Amanda edits Neo Google Sheet (any of the 3 read-by-sync tabs)
+  ↓
+GitHub Actions sync-neo.yml (daily at 8am ET) or manual:
+  node scripts/sync-from-neo.mjs
+    1. batchGet "Tenant Info" + "property-info-clean" in one Sheets API call
+    2. Validate required headers in BOTH tabs; exit non-zero before any write if missing
+    3. Build canonical address map (Tenant Info Property column wins on spelling)
+    4. Validate every Tenant address resolves to a unit (existing or to-be-upserted);
+       exit non-zero before any delete if not — per "no lost properties" rule
+    5. Upsert units by address (BATCH=50, onConflict='address')
+    6. Snapshot residents + next_residents → delete → re-insert (per matched unit)
+    7. Send change-summary email if Gmail env vars set
 
-Property domain (read-write):
-  Google Sheet edited by team / seeded by seed-units-from-csv.mjs
-    → Scheduled task: node scripts/sync-property-cache.mjs
-        → Reads "property-info-clean" Google Sheet tab
-        → Upserts property attributes (beds, baths, ac_type, etc.) into Supabase units
+Dashboard reads:
+  /api/get-units → Supabase (units + residents + next_residents)
+  /api/get-property-info → live Google Sheet read (always fresh)
 
-  → Dashboard calls /api/get-units → Netlify function queries Supabase → renders data
-  → Property Info tab calls /api/get-property-info → reads Google Sheet → renders fields
-  → Edits call /api/update-property-info → writes to Google Sheet → sync-property-cache picks up
+Dashboard writes:
+  /api/update-property-info → Google Sheet (then next sync picks up)
+  /api/save-inspection → "Turnover Inspections" tab
+  /api/save-note → Supabase notes table (separate table, not the Sheet)
 ```
 
-**Key gotcha (fixed March 2026):** The sync script used to read stale CSVs from `/tmp/mills_export/` that were only updated when manually exported from the Numbers app. Now it re-exports fresh CSVs from the `.numbers` file on every run using `numbers-parser`. If data looks stale, check that `/Volumes/One Touch/` is mounted and run the sync manually.
+### Tenant Info reader
+Header-based lookup with aliases — see `src/config/tenantInfoColumns.js`. The field-spec module uses normalized (case-insensitive, smart-quote-tolerant) header matching with multiple aliases per field, so renaming columns in the sheet won't break the sync. `Property` and `Resident` are the only required headers — sync exits non-zero before any delete if they go missing.
+
+### Sync safety mechanics
+- **Always preview first:** `node --env-file=.env scripts/sync-from-neo.mjs --dry-run`. Prints the planned diff (units to upsert, residents to delete/insert, sample rows, any unresolved addresses). Zero Supabase writes. The cloud workflow does not pass `--dry-run`.
+- **Fail-loud on missing headers:** required headers (`Property` in both tabs, `Resident` in Tenant Info) absent → exit non-zero before any write.
+- **Fail-loud on unresolved tenants:** every Tenant Info address must resolve to a unit (existing in Supabase or about to be upserted). If any don't, exit non-zero before any resident delete. This enforces the "don't lose properties" rule.
+
+**Key gotcha (Neo migration, April 2026):** Property-info-clean's `Notes` column maps to `units.unit_notes` (not `units.notes`) to avoid collision with the resident-derived `notes` aggregation in `get-units.js`. PropertyInfoTab.jsx reads/writes `unit_notes`. Don't reintroduce `'Notes': 'notes'` in `HEADER_TO_FIELD`.
+
+**Key gotcha (Neo migration, April 2026):** Owner / Area come from `property-info-clean` only. The Tenant Info tab also has Owner / Area columns but they're advisory display columns for Amanda — the sync ignores them. If owner appears wrong on a tile, fix it in property-info-clean.
 
 **Key gotcha (fixed March 2026):** `get-units.js` was originally reading from Google Sheets, not Supabase. It now queries Supabase directly. If the dashboard shows "Local data" instead of "Synced", the Netlify function is failing — check Netlify function logs.
 
-**Key gotcha (fixed April 2026):** `sync-from-numbers.mjs` used to upsert new `units` rows directly from Amanda's Numbers file, causing duplicate tiles when addresses didn't match exactly between the two sources. It now fetches existing Supabase units first and only attaches residents to matched units — it never creates new unit rows. The Property Info Google Sheet is the authoritative source of what units exist. Address matching is three-tier: exact → normalized (lowercase, strip periods, collapse spaces) → suffix-stripped (removes trailing St/Dr/Ave/etc.). Unmatched Numbers addresses are logged as warnings.
+**Key gotcha (fixed April 2026):** `sync-from-neo.mjs`'s predecessors used to upsert new `units` rows from the tenant source, causing duplicate tiles. The current script upserts units by address from `property-info-clean` only, then attaches residents to those units. Address matching is three-tier: exact → normalized (lowercase, strip periods, collapse spaces) → suffix-stripped (removes trailing St/Dr/Ave/etc.).
 
 **Duplicate cleanup (April 2026):** 26 orphan duplicate unit rows were cleaned up — these were address variants (e.g. "230 Valley Park" vs "230 Valley Park Dr", "201 E. Carr St" vs "201 E Carr St") left over from before the suffix-aware matching was added. `cleanup-duplicate-units.mjs` dynamically discovers the Google Sheet tab name (currently "property-info-clean") to avoid breakage if the tab is renamed again.
 
@@ -50,30 +71,31 @@ Property domain (read-write):
 
 **Phase 2 SQL (already run):** Added 11 new columns to `units` + created `notes` and `inspections` tables. If setting up fresh, run the SQL block from the Phase 2 migration handoff.
 
-### Numbers File Sheet Names (as exported to CSV)
-- `2025-26 renewals.csv` → Sheet1 (tenant/renewal data)
-- `property info.csv` → Sheet2 (property details)
+### Tenant Info column mapping (header-name based, source-agnostic)
+Mappings live in `src/config/tenantInfoColumns.js`. Lookup is by **header name** (case-insensitive, smart-quote-tolerant); column position is irrelevant. Each field key carries aliases — current Neo header first, then prior names — so renaming columns in Neo won't break the sync.
 
-### Numbers Sheet 1 Column Indices
-| Col | Header | Supabase field |
-|-----|--------|---------------|
-| 0 | Property | `units.address` |
-| 1 | Resident | `residents.name` |
-| 2 | Email | `residents.email` |
-| 3 | Phone | `residents.phone` |
-| 4 | Lease end date | `residents.lease_end` |
-| 5 | Move Out Date | `residents.move_out_date` |
-| 6 | Status | `residents.status` |
-| 7 | Lease signed | `residents.lease_signed` |
-| 8 | Deposit paid | `residents.deposit_paid` |
-| 9 | Notes | `residents.notes` |
-| 10 | Resident for Next Year | `next_residents.name` |
-| 11 | Next Resident's Email | `next_residents.email` |
-| 12 | Next Resident's Phone Number | `next_residents.phone` |
-| 13 | Next Residents Move In Date | `next_residents.move_in_date` |
-| 16 | Freeze warning? | `units.freeze_warning` |
-| 17 | Owner | `units.owner_name` |
-| 18 | Area | `units.area` |
+| Field key (sync) | Neo header | Legacy `.numbers` header | Supabase target |
+|---|---|---|---|
+| `address` | Property | Property | `units.address` (resolves to `unit_id`) |
+| `residentName` | Resident | Resident | `residents.name` |
+| `residentEmail` | Email | Email | `residents.email` |
+| `residentPhone` | Phone | Phone | `residents.phone` |
+| `leaseEnd` | Lease End | Lease end date | `residents.lease_end` |
+| `status` | Status | Status | `residents.status` |
+| `leaseSigned` | Lease Signed | lease signed | `residents.lease_signed` |
+| `depositPaid` | Deposit Paid | Deposit paid | `residents.deposit_paid` |
+| `moveOut` | Move Out Date | Move Out Date | `residents.move_out_date` |
+| `notes` | Notes | Notes | `residents.notes` |
+| `nextResident` | Next Resident | Resident for Next Year | `next_residents.name` |
+| `nextEmail` | Next Email | Next Resident's Email | `next_residents.email` |
+| `nextPhone` | Next Phone | Next Resident's Phone Number (if new tenant) | `next_residents.phone` |
+| `nextMoveIn` | Next Move In | Next Residents Move In Date | `next_residents.move_in_date` |
+| `owner` | Owner | Owner | `units.owner_name` |
+| `area` | Area | Area | `units.area` |
+
+`address` and `residentName` are required — sync exits non-zero before any delete if they're missing. Optional fields write null/empty if absent.
+
+`Freeze Warning` exists in the Tenant Info source but is **not synced from there** — `freeze_warning` on a unit comes from the `property-info-clean` tab. Same for `owner` and `area` (Tenant Info versions are advisory; property-info-clean is authoritative).
 
 ### Netlify Functions
 | Function | Method | Purpose |
@@ -89,15 +111,18 @@ Property domain (read-write):
 | `get-calendar-tasks` | GET | Fetches calendar tasks by date range (`?start=&end=`), overlap query |
 | `save-calendar-task` | POST | Upsert calendar task (id present → update, else insert) |
 | `delete-calendar-task` | POST | Delete calendar task by `{ id }` |
-| `trigger-sync` | POST | Dispatches GitHub Actions `sync-numbers.yml` workflow via `workflow_dispatch`. Requires `GITHUB_TOKEN` env var (actions:write scope). Returns `{ ok: true }` on 204 from GitHub. |
+| `trigger-sync` | POST | Dispatches GitHub Actions `sync-neo.yml` workflow via `workflow_dispatch`. Requires `GH_DISPATCH_TOKEN` env var (actions:write scope). Returns `{ ok: true }` on 204 from GitHub. |
 
 ### Column Config (`src/config/columns.js`)
-Single source of truth for the Google Sheet ↔ field key mapping. Both `get-property-info.js` and `update-property-info.js` import from here — **add new fields here only**.
+Single source of truth for the property-info-clean tab ↔ field key mapping, used by `get-property-info.js`, `update-property-info.js`, and `sync-from-neo.mjs`. **Add new property-side fields here only.**
 - `HEADER_TO_FIELD` — sheet header → field key (supports aliases for legacy column names)
 - `FIELD_TO_HEADER` — field key → canonical sheet header (used for writes)
 - `NEW_SHEET_COLUMNS` — columns appended by the migration script
+- `SHEET_TABS` — single source of truth for tab names (`PROPERTY_INFO`, `HISTORY`, `INSPECTIONS`, `TENANT_INFO`)
 
 **Column lookup is name-based, not positional.** Rearranging columns in the Google Sheet is safe — code finds columns by scanning the header row. Do not use column indices anywhere.
+
+**Notes vs unit_notes (April 2026):** The `Notes` column in property-info-clean maps to the field `unit_notes` (NOT `notes`). This avoids collision with the resident-derived `notes` aggregation that `get-units.js` produces from joining `residents` rows. PropertyInfoTab.jsx reads/writes `unit_notes`. Do not change `'Notes': 'unit_notes'` in `HEADER_TO_FIELD`.
 
 **Legacy column U ("Door Codes"):** The original sheet had door codes at column U before the dashboard-managed fields were moved to AF ("Door Code"). Column U still has some legacy door code data for a handful of properties. The dashboard reads from AF (canonical). Do not delete or rename the U header.
 
@@ -111,12 +136,12 @@ Column positions may shift as the team rearranges the sheet — always rely on h
 ### Scripts
 | Script | Purpose | Run |
 |--------|---------|-----|
-| `sync-from-numbers.mjs` | Reads Numbers Sheet 1 → attaches residents/next_residents to existing Supabase units; updates owner/area. Never creates new unit rows. After sync, diffs residents/next_residents and emails changes if Gmail env vars are set. | Scheduled + manual |
-| `sync-property-cache.mjs` | Reads Property Info Google Sheet → upserts Supabase units (property attributes) | Scheduled + manual |
-| `cleanup-duplicate-units.mjs` | Finds Supabase unit rows whose address doesn't match any Property Info sheet address and deletes them. Dry-run by default; pass `--confirm` to delete. | Manual only (after fixing address mismatches) |
-| `add-missing-properties.mjs` | One-time script used April 2026 to add 5 Howell St #1–9 and 203 E. Carr St to the Property Info sheet. Safe to re-run (skips existing rows). | Manual only |
-| `seed-units-from-csv.mjs` | One-time seed from `Mills_Dashboard_Property_info_sheet.csv` → Supabase units | Manual only |
-| `migrate-sheet2-to-gsheet.mjs` | One-time migration — Numbers Sheet 2 → Google Sheet (run once to populate new columns) | Manual only |
+| `sync-from-neo.mjs` | Single-pass sync: reads "Tenant Info" + "property-info-clean" tabs of the Neo sheet, upserts units, replaces residents/next_residents, sends change-summary email. Always preview first with `--dry-run`. Fails loudly before any write if a required header is missing or any Tenant address fails to resolve. | Scheduled (GH Actions) + manual |
+| `cleanup-duplicate-units.mjs` | One-time: finds Supabase unit rows whose address doesn't match any property-info-clean row and deletes them. Dry-run by default; pass `--confirm` to delete. | Manual only |
+| `add-missing-properties.mjs` | One-time: adds new properties to property-info-clean (used April 2026 for 5 Howell St + 203 E. Carr St). Safe to re-run (skips existing). Run sync-from-neo.mjs after. | Manual only |
+| `seed-units-from-csv.mjs` | One-time: original seed of Supabase units from `Mills_Dashboard_Property_info_sheet.csv`. | Manual only |
+| `migrate-sheet2-to-gsheet.mjs` | One-time: migrated Numbers Sheet 2 → Google Sheet during initial property-info migration. | Manual only / historical |
+| `db/migrations/2026-04-28-expand-units-for-neo.sql` | One-time: adds 32 nullable text columns to `units` (door_code, lockbox_code, appliance service records, paint, portfolio, lead_paint, etc.). Idempotent — `IF NOT EXISTS`. Apply in Supabase SQL editor before first run of `sync-from-neo.mjs`. | One-time, in Supabase SQL editor |
 
 ## Theming
 
@@ -243,16 +268,26 @@ Swimlane-style calendar for scheduling turnover work during May–August season.
 
 **Dashboard shows "Local data" (orange dot)** — Netlify function failed. Check Netlify function logs. Common causes: Supabase credentials missing in Netlify env vars, Supabase down.
 
-**Dashboard data is stale / changes not showing** — The sync didn't run or ran against old CSVs. Check:
-1. Is `/Volumes/One Touch/` mounted? (`ls "/Volumes/One Touch/"`)
-2. Run sync manually: `cd /Users/millsrentals/Mills-Dashboard && node --env-file=.env scripts/sync-from-numbers.mjs`
-3. Check scheduled task is active in Claude Code.
+**Dashboard data is stale / changes not showing** — The sync didn't run. Check:
+1. Preview the diff: `node --env-file=.env scripts/sync-from-neo.mjs --dry-run`
+2. Run sync manually: `node --env-file=.env scripts/sync-from-neo.mjs`
+3. Check the daily GitHub Actions run: https://github.com/squid-baby/Mills-Dashboard/actions/workflows/sync-neo.yml — was the last run green?
 
-**Phone numbers / new columns not appearing** — Verify the Numbers file column indices match `scripts/sync-from-numbers.mjs` `S1`/`S2` constants. Print headers with: `python3 -c "import numbers_parser; doc = numbers_parser.Document('...'); [print(i, c.value) for i, c in enumerate(doc.sheets[0].tables[0].rows()[0])]"`
+**Sync exits with "Missing required column header(s)"** — A required header (`Property` in either tab, or `Resident` in Tenant Info) is no longer present under any known alias. Open the Neo sheet, confirm the actual header text, and add it to the relevant `headers` array in `src/config/tenantInfoColumns.js` (Tenant Info) or `HEADER_TO_FIELD` in `src/config/columns.js` (property-info-clean). The sync correctly refused to delete residents — no data was lost.
 
-**Property Info fields missing (beds, baths, town, etc.)** — Run `sync-property-cache.mjs` to pull latest from Google Sheet → Supabase: `node --env-file=.env scripts/sync-property-cache.mjs`. Or re-seed from CSV: `node --env-file=.env scripts/seed-units-from-csv.mjs`.
+**Sync exits with "N Tenant Info address(es) do not resolve to any unit"** — The named addresses appear in Tenant Info but not in property-info-clean (and don't fuzzy-match anything there either). Either add them to property-info-clean, or correct the spelling in Tenant Info to match. The sync refused to touch residents — no data was lost.
 
-**Adding a new property info field** — Add entries to both `HEADER_TO_FIELD` and `FIELD_TO_HEADER` in `src/config/columns.js`. If it's a new Google Sheet column, add the header name to `NEW_SHEET_COLUMNS` in the same file and re-run the migration script.
+**Owner/area appearing wrong on tiles** — Almost always means property-info-clean has the wrong value. Fix it in the Neo sheet, then run sync. Reminder: Tenant Info's Owner/Area columns are advisory and **not synced** — they're for Amanda's view only.
+
+**Sync fails with "invalid input syntax for type integer"** — A free-text value landed in an integer column (`year_built`, `sq_ft`). The script's `coerce()` function uses `parseInt` which extracts leading digits ("1925, 1995 renov." → 1925), but if the cell starts with non-digits, it returns null. If null is invalid for the column, fix the source cell or relax the column type.
+
+**Phone numbers / new columns not appearing** — The header probably isn't in the field-spec. Inspect the source headers (run `--dry-run` and look at the `Header map` line). For Tenant Info, add to `src/config/tenantInfoColumns.js`. For property-info-clean, add to `HEADER_TO_FIELD` in `src/config/columns.js`. If the target Supabase column doesn't exist yet, add it via a new SQL migration in `db/migrations/`.
+
+**`netlify dev` API endpoints hang locally** — macOS Google Drive sync creates `._*` resource-fork files alongside every function file. Netlify-dev tries to load those as functions and routing breaks. Workaround: delete the `netlify/functions/._*` files (they regenerate harmlessly when Drive next syncs) before running `netlify dev`. The deployed Netlify site doesn't have this issue.
+
+**Need to roll back the Neo migration** — `git revert` the merge commit. The `.numbers` file is still in Drive at `/Volumes/One Touch/The_Team_Google_Drive Sync/2025-2026 Renewals_Dashboard.numbers` as a frozen backup. Restoring `sync-from-numbers.mjs` + `sync-property-cache.mjs` + `download-numbers-file.mjs` from history pre-cutover gets you back to the prior architecture.
+
+**Adding a new property info field** — Two-step process: (1) add a SQL migration in `db/migrations/` that adds the column to `units`, run it in Supabase. (2) Add `HEADER_TO_FIELD` + `FIELD_TO_HEADER` entries in `src/config/columns.js`. Next sync run picks it up automatically.
 
 ## Dev Setup
 ```bash
@@ -264,9 +299,12 @@ npx netlify dev  # Runs on port 8888, proxies /api to Netlify functions
 ## Environment Variables
 - `SUPABASE_URL` — Supabase project URL
 - `SUPABASE_SERVICE_KEY` — Supabase service role key (never commit this)
-- `GOOGLE_SERVICE_ACCOUNT_JSON` — Google service account credentials (for Property Info sheet)
-- `SHEET_ID_PROPERTY_INFO` — Google Sheet ID for property info + inspections
-- `GITHUB_TOKEN` — GitHub PAT with `actions:write` scope (Netlify env var, used by `trigger-sync.js`)
+- `GOOGLE_SERVICE_ACCOUNT_JSON` — Google service account credentials (one service account, used for all Neo sheet reads/writes)
+- `SHEET_ID_PROPERTY_INFO` — Neo Google Sheet ID (hosts all four tabs)
+- `GH_DISPATCH_TOKEN` — GitHub PAT with `actions:write` scope (Netlify env var, used by `trigger-sync.js` to dispatch `sync-neo.yml`)
 - `GMAIL_USER` — Gmail address for sending change summary emails (optional)
 - `GMAIL_APP_PASSWORD` — Gmail app password (optional)
+- `MEETING_EMAIL_TO` — recipient for change-summary emails (optional)
+
+**GitHub Actions secrets** (used by `.github/workflows/sync-neo.yml`): `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SHEET_ID_PROPERTY_INFO`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `MEETING_EMAIL_TO`. The pre-Neo `NUMBERS_FILE_ID` secret is no longer used — safe to delete or leave.
 - `MEETING_EMAIL_TO` — Recipient address for sync change emails + meeting summaries (optional)

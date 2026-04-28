@@ -77,17 +77,17 @@ export default function PropertyInfoTab({ unit, accentColor }) {
     setSavingNote(true);
     const timestamp = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     const newEntry = `[${timestamp}] ${quickNote.trim()}`;
-    const existing = gsheetData['notes'] || '';
+    const existing = gsheetData['unit_notes'] || '';
     const combined = existing ? `${existing}\n${newEntry}` : newEntry;
     try {
       const res = await fetch('/api/update-property-info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: unit.address, field: 'notes', oldValue: existing, value: combined, by: 'Dashboard' }),
+        body: JSON.stringify({ address: unit.address, field: 'unit_notes', oldValue: existing, value: combined, by: 'Dashboard' }),
       });
       const result = await res.json();
       if (result.success) {
-        setGsheetData(prev => ({ ...prev, notes: combined }));
+        setGsheetData(prev => ({ ...prev, unit_notes: combined }));
         setQuickNote('');
       }
     } catch { /* silent */ }
@@ -209,8 +209,8 @@ export default function PropertyInfoTab({ unit, accentColor }) {
             {savingNote ? '...' : '+'}
           </button>
         </div>
-        {gsheetData['notes'] ? (
-          gsheetData['notes'].split('\n').map((line, i) => (
+        {gsheetData['unit_notes'] ? (
+          gsheetData['unit_notes'].split('\n').map((line, i) => (
             <div key={i} style={{
               padding: '8px 12px', background: 'var(--bg-elevated)',
               borderRadius: 'var(--radius-sm)', marginBottom: 4,

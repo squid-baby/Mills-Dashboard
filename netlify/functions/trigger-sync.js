@@ -1,5 +1,5 @@
-// Dispatches the sync-numbers.yml workflow via GitHub API workflow_dispatch.
-// GITHUB_TOKEN must be set in Netlify env vars (actions:write scope).
+// Dispatches the sync-neo.yml workflow via GitHub API workflow_dispatch.
+// GH_DISPATCH_TOKEN must be set in Netlify env vars (actions:write scope).
 
 export async function handler(event) {
   if (event.httpMethod !== 'POST') {
@@ -12,7 +12,7 @@ export async function handler(event) {
   }
 
   const res = await fetch(
-    'https://api.github.com/repos/squid-baby/Mills-Dashboard/actions/workflows/sync-numbers.yml/dispatches',
+    'https://api.github.com/repos/squid-baby/Mills-Dashboard/actions/workflows/sync-neo.yml/dispatches',
     {
       method: 'POST',
       headers: {

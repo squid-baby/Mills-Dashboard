@@ -165,4 +165,4 @@ await sheets.spreadsheets.values.append({
 });
 
 console.log(`\n✓ Appended ${rowsToAppend.length} rows to Property Info sheet.`);
-console.log('Run sync-property-cache.mjs next to pull them into Supabase.');
+console.log('Run sync-from-neo.mjs next to pull them into Supabase.');
