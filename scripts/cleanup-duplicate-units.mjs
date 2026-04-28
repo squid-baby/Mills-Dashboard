@@ -1,10 +1,10 @@
 /**
  * cleanup-duplicate-units.mjs
  *
- * One-time script: removes unit rows from Supabase that exist ONLY because
- * sync-from-numbers.mjs created them from Amanda's Numbers file — i.e. units
- * that have NO property info (beds is null/0 AND baths is null/empty) AND
- * whose address does NOT match any row in the Property Info Google Sheet.
+ * One-time cleanup: removes unit rows from Supabase that have no property
+ * info (beds is null/0 AND baths is null/empty) AND whose address does not
+ * match any row in the Neo "property-info-clean" tab. Was last needed in
+ * April 2026 to clean up rows the old per-tab sync had left behind.
  *
  * Safe to run multiple times. Prints a dry-run report first, then asks you
  * to pass --confirm to actually delete.
