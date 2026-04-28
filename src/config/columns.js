@@ -84,9 +84,14 @@ export const HEADER_TO_FIELD = {
   'Paint Last Done':            'paint_last_done',
 
   // Notes
-  'Notes':                      'notes',
-  'notes':                      'notes',
+  // 'Notes' targets unit_notes (NOT notes) to avoid collision with the
+  // resident-derived `notes` aggregation in get-units.js.
+  'Notes':                      'unit_notes',
   'Sheet Notes':                'sheet_notes',
+
+  // Portfolio + lead paint (added with Neo migration)
+  'Portfolio':                  'portfolio',
+  'Lead Paint':                 'lead_paint',
 };
 
 // ─── Write direction: field key → canonical sheet column header ───────────────
@@ -159,8 +164,12 @@ export const FIELD_TO_HEADER = {
   'paint_last_done':            'Paint Last Done',
 
   // Notes
-  'notes':                      'Notes',
+  'unit_notes':                 'Notes',
   'sheet_notes':                'Sheet Notes',
+
+  // Portfolio + lead paint
+  'portfolio':                  'Portfolio',
+  'lead_paint':                 'Lead Paint',
 };
 
 // New Google Sheet columns that the migration script must append if not present
@@ -179,4 +188,5 @@ export const SHEET_TABS = {
   PROPERTY_INFO: 'property-info-clean',
   HISTORY: 'Property Info History',
   INSPECTIONS: 'Turnover Inspections',
+  TENANT_INFO: 'Tenant Info',
 };
