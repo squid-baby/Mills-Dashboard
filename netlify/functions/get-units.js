@@ -33,6 +33,15 @@ export async function handler() {
         property_type, sq_ft, freeze_warning, pets_allowed, year_built,
         town, washer, dryer, dishwasher, gas, sump_pump, breaker_box,
         ac_type, heat_type, sheet_notes,
+        door_code, lockbox_code, alarm_code, key_location,
+        stove, stove_replaced, stove_warranty,
+        washer_replaced, washer_warranty, dryer_replaced, dryer_warranty,
+        dishwasher_replaced, dishwasher_warranty, fridge_replaced, fridge_warranty,
+        hvac_last_service, water_heater_location, water_heater_type, water_heater_last_service,
+        water_shutoff, filter_size, filter_size_2, internet_provider,
+        toilet_flapper_style, toilet_seat_style,
+        paint_interior, paint_trim, paint_brand, paint_last_done,
+        unit_notes, portfolio, lead_paint,
         residents ( name, email, phone, status, lease_end, move_out_date, lease_signed, deposit_paid, notes ),
         next_residents ( name, email, phone, move_in_date )
       `)
@@ -115,8 +124,8 @@ function buildUnit(row, id) {
       sqft:          row.sq_ft || '',
       yearBuilt:     row.year_built || '',
       town:          row.town || '',
-      // These are also exposed via get-property-info (source: gsheet) but
-      // kept here so Tile / other components can read them without an extra fetch.
+      // Mirrored from get-property-info (source: gsheet) so Tile / other
+      // components can read them without an extra per-unit fetch.
       washer:        !!row.washer,
       dryer:         !!row.dryer,
       dishwasher:    !!row.dishwasher,
@@ -127,6 +136,45 @@ function buildUnit(row, id) {
       ac_type:       row.ac_type || '',
       heat_type:     row.heat_type || '',
       pets_allowed:  row.pets_allowed || '',
+      // Access (cached from Neo property-info-clean)
+      door_code:     row.door_code || '',
+      lockbox_code:  row.lockbox_code || '',
+      alarm_code:    row.alarm_code || '',
+      key_location:  row.key_location || '',
+      // Appliance models + service records
+      stove:                    row.stove || '',
+      stove_replaced:           row.stove_replaced || '',
+      stove_warranty:           row.stove_warranty || '',
+      washer_replaced:          row.washer_replaced || '',
+      washer_warranty:          row.washer_warranty || '',
+      dryer_replaced:           row.dryer_replaced || '',
+      dryer_warranty:           row.dryer_warranty || '',
+      dishwasher_replaced:      row.dishwasher_replaced || '',
+      dishwasher_warranty:      row.dishwasher_warranty || '',
+      fridge_replaced:          row.fridge_replaced || '',
+      fridge_warranty:          row.fridge_warranty || '',
+      // HVAC + water heater
+      hvac_last_service:         row.hvac_last_service || '',
+      water_heater_location:     row.water_heater_location || '',
+      water_heater_type:         row.water_heater_type || '',
+      water_heater_last_service: row.water_heater_last_service || '',
+      water_shutoff:             row.water_shutoff || '',
+      // Filters / connectivity
+      filter_size:        row.filter_size || '',
+      filter_size_2:      row.filter_size_2 || '',
+      internet_provider:  row.internet_provider || '',
+      // Plumbing
+      toilet_flapper_style: row.toilet_flapper_style || '',
+      toilet_seat_style:    row.toilet_seat_style || '',
+      // Paint
+      paint_interior:   row.paint_interior || '',
+      paint_trim:       row.paint_trim || '',
+      paint_brand:      row.paint_brand || '',
+      paint_last_done:  row.paint_last_done || '',
+      // Misc
+      unit_notes:  row.unit_notes || '',
+      portfolio:   row.portfolio || '',
+      lead_paint:  row.lead_paint || '',
     },
   };
 }
