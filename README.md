@@ -49,55 +49,23 @@ Appfolio is the official property management system. It has the most complete te
 4. Export as CSV
 5. Save to: `/Volumes/One Touch/The_Team_Google_Drive Sync/Mills Dashboard/2025-2026 Renewals_Dashboard_Sync_v4/2025-2026 Renewals_Dashboard_export_Fresh/`
 
-### 2. Amanda's Numbers Spreadsheet (source of truth)
+### 2. Neo Google Sheet (source of truth — all sheet data lives here)
 
-This is the master renewal tracking file. Amanda maintains it manually throughout the renewal season. It tracks everything Appfolio doesn't: who's renewing vs leaving, whether leases are signed, deposit status, next-year resident assignments, and notes.
+Single Google Sheet ("Mills Dashboad - Neo") that holds everything Amanda and the team edit. Service-account access is shared with the dashboard. Replaces the prior `.numbers` file + separate Property Info sheet split (April 2026).
 
-**File location (Google Drive, synced locally):**
-```
-/Volumes/One Touch/The_Team_Google_Drive Sync/2025-2026 Renewals_Dashboard.numbers
-```
+**Tabs:**
+- `Tenant Info` — current/next residents, lease/move dates, status. Sync reads it; nothing writes back.
+- `property-info-clean` — every property attribute (beds, owner, codes, appliance models, paint, etc.). Sync reads it; PropertyInfoTab writes back via `update-property-info`.
+- `Turnover Inspections` — inspection records written by the inspection app.
+- `Property Info History` — audit log appended on every property field edit.
 
-**Working copy (used by sync tools):**
-```
-/Volumes/One Touch/The_Team_Google_Drive Sync/Mills Dashboard/
-  2025-2026 Renewals_Dashboard_Sync_v4/2025-26 renewals-2019-20 Tenants.numbers
-```
+Column lookup is **header-name based** (case-insensitive, smart-quote-tolerant). Mappings live in:
+- `src/config/tenantInfoColumns.js` for Tenant Info
+- `src/config/columns.js` (`HEADER_TO_FIELD` / `FIELD_TO_HEADER`) for property-info-clean
 
-**Sheet 1 columns ("2025-26 renewals"):**
+Renaming columns in the sheet is safe — add the new header to the relevant `headers` array. Reordering columns is safe — code never relies on position.
 
-| Col | Header | What it tracks |
-|-----|--------|---------------|
-| A | Property | Unit address (e.g. "136 B Purefoy Rd") |
-| B | Resident | Current tenant name |
-| C | Email | Current tenant email |
-| D | Phone | Current tenant phone |
-| E | Lease end date | When the current lease expires |
-| F | Move Out Date | When they're actually moving out (if leaving) |
-| G | Status | `renewing`, `leaving`, `month to month`, `unknown` |
-| H | Lease signed | `yes` / blank |
-| I | Deposit paid | `yes` / blank |
-| J | Notes | Amanda's notes |
-| K | Resident for Next Year | Next tenant name (if turnover) |
-| L | Next Resident's Email | Next tenant email |
-| M | Next Resident's Phone Number | Next tenant phone |
-| N | Next Residents Move In Date | When the new tenant moves in |
-| O | Next year's lease end date | (unused by dashboard) |
-| P | Notes for next turnover | (handled separately) |
-| Q | Freeze warning? | `yes` if pipes freeze |
-| R | Owner | Property owner name |
-| S | Area | Geographic area (Purefoy, Carrboro, etc.) |
-
-### 3. Property Info Google Sheet (read/write)
-
-A separate Google Sheet with detailed property information that the dashboard can both read and write to. Shared with a Google service account.
-
-**What it stores:**
-- Physical details: bedrooms, bathrooms, sq ft, property type, year built
-- Appliances: washer, dryer, dishwasher, AC type, heat type
-- Management: door codes, lockbox codes, paint colors, appliance dates
-- Turnover inspections: condition assessments, replacement items, overall ratings
-- Edit history: every field change is logged with timestamp
+The pre-Neo `.numbers` file is still in Drive at `/Volumes/One Touch/The_Team_Google_Drive Sync/2025-2026 Renewals_Dashboard.numbers` as a frozen backup. Nothing reads it.
 
 ### 4. Supabase (cloud database)
 
@@ -142,55 +110,38 @@ node sync-tenant-phones.js \
 - Future tenants in Appfolio map to "Next Year Residents" in Numbers
 - Current/Notice tenants map to "Current Residents"
 
-### Step 2: Amanda Reviews and Updates the Numbers File
+### Step 2: Amanda Reviews and Updates the Neo Sheet
 
-After the backfill, Amanda (or you) opens the updated CSV and the Numbers spreadsheet side by side:
-
+After the Appfolio backfill, transfer the filled-in phone/email columns into the Neo sheet's "Tenant Info" tab:
 1. Open the backfilled CSV (the one the script overwrote)
-2. Open the Numbers spreadsheet
-3. **Copy column, paste column** - transfer the filled-in phone/email columns from the CSV into the Numbers file
-4. Review the `sync-report.html` for any conflicts that need manual resolution
-5. Save the Numbers file
+2. Open the Neo Google Sheet → "Tenant Info" tab
+3. **Copy column, paste column** — transfer the filled-in phone/email values
+4. Review `sync-report.html` for conflicts needing manual resolution
 
-This manual review step is intentional - Amanda is the source of truth and needs to verify everything before it goes into her spreadsheet.
+This manual review step is intentional — Amanda verifies everything before it lands in the source-of-truth sheet. (The legacy `.numbers` workflow that bypassed this via `numbers-parser` writes is no longer used.)
 
-**Alternatively**, the sync can write directly to the `.numbers` file using `numbers-parser`:
+### Step 3: Sync Neo Sheet to Supabase
 
-```bash
-# This was done on 2026-03-30 to backfill 80 fields directly
-python3 -c "
-import numbers_parser, csv
-# ... reads backfilled CSV, writes to .numbers file
-# Only fills blank cells, never overwrites
-"
-```
+Once Neo is updated, push it to Supabase so the dashboard can see it.
 
-### Step 3: Sync Numbers File to Supabase
-
-Once the Numbers file is updated, push it to Supabase so the dashboard can see it.
-
-**Tool:** `scripts/sync-from-numbers.mjs`
-**Location:** `/Users/millsrentals/Mills-Dashboard/scripts/`
+**Tool:** `scripts/sync-from-neo.mjs`
 
 ```bash
-cd /Users/millsrentals/Mills-Dashboard
-node --env-file=.env scripts/sync-from-numbers.mjs
+node --env-file=.env scripts/sync-from-neo.mjs --dry-run  # preview first
+node --env-file=.env scripts/sync-from-neo.mjs            # live
 ```
 
-**What it does:**
-1. Reads the `.numbers` file directly using `numbers-parser` (Python) - no manual CSV export needed
-2. Exports fresh CSVs to `/tmp/mills_export/`
-3. Parses Sheet 1 (tenants) and Sheet 2 (property info)
-4. Upserts units into Supabase (matched by address)
-5. Deletes and re-inserts residents and next_residents for synced units
-6. Reports counts when done
+**What it does (single pass over both data tabs):**
+1. `batchGet` "Tenant Info" + "property-info-clean" via the Sheets API
+2. Validates required headers in both tabs; exits non-zero before any write if missing
+3. Validates every Tenant address resolves to a unit; exits non-zero before any delete if not (per "no lost properties" rule)
+4. Upserts units (batch 50, by address)
+5. Deletes + reinserts residents/next_residents for matched units
+6. Sends change-summary email if Gmail env vars set
 
-**This runs automatically** via a Claude Code scheduled task or GitHub Actions, and can also be triggered manually from the dashboard's Sync button (see below).
+**Runs automatically** via the daily GitHub Actions workflow (`sync-neo.yml`, 8am ET) and on-demand from the dashboard's Sync button.
 
-**Requires:**
-- `/Volumes/One Touch/` must be mounted (external drive connected)
-- `.env` file with `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`
-- `numbers-parser` Python package installed
+**Requires:** `.env` (or env vars) with `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `SHEET_ID_PROPERTY_INFO`.
 
 ### Step 4: Dashboard Reads from Supabase
 
@@ -308,9 +259,11 @@ The "Export Turnovers" button exports a CSV of all turnover units (filtered to y
     delete-calendar-task.js                     #   Delete calendar task
     trigger-sync.js                             #   Dispatch GitHub Actions sync workflow
   scripts/
-    sync-from-numbers.mjs                       #   Numbers file -> Supabase sync
-    sync-property-cache.mjs                     #   Google Sheet -> Supabase property attrs
+    sync-from-neo.mjs                           #   Neo Google Sheet -> Supabase (consolidated)
+    cleanup-duplicate-units.mjs                 #   One-time: dedup orphan unit rows
     meeting-capture/                            #   Meeting recording + transcription + email
+  db/migrations/
+    2026-04-28-expand-units-for-neo.sql         #   Units schema additions for Neo migration
   .env                                          # Credentials (never committed)
 ```
 
@@ -345,32 +298,27 @@ The "Export Turnovers" button exports a CSV of all turnover units (filtered to y
 ### "Amanda updated the spreadsheet, dashboard needs to reflect it"
 
 ```bash
-cd /Users/millsrentals/Mills-Dashboard
-node --env-file=.env scripts/sync-from-numbers.mjs
+node --env-file=.env scripts/sync-from-neo.mjs --dry-run  # preview
+node --env-file=.env scripts/sync-from-neo.mjs            # live
 ```
+
+Or click the Sync button in the dashboard header (dispatches the GitHub Actions workflow).
 
 ### "We have a new Appfolio export and need to backfill phones"
 
 1. Save the Appfolio CSV to the export folder on the drive
-2. Export fresh CSVs from the Numbers file:
-```bash
-cd /Users/millsrentals/Mills-Dashboard
-node --env-file=.env scripts/sync-from-numbers.mjs
-# (this exports CSVs to /tmp/mills_export/ as a side effect)
-```
+2. Export the Tenant Info tab to CSV from the Neo sheet (File → Download → CSV)
 3. Run the backfill:
 ```bash
 cd "/Volumes/One Touch/The_Team_Google_Drive Sync/Mills Dashboard/2025-2026 Renewals_Dashboard_Sync_v4"
 node sync-tenant-phones.js \
-  --numbers "/tmp/mills_export/2025-26 renewals.csv" \
+  --numbers "<path-to-tenant-info-export>.csv" \
   --appfolio "2025-2026 Renewals_Dashboard_export_Fresh/tenant_directory-YYYYMMDD.csv"
 ```
-4. Review `sync-report.html` in a browser
-5. Copy the backfilled columns into the Numbers spreadsheet (or use numbers-parser to write directly)
-6. Re-run the Supabase sync:
+4. Review `sync-report.html`, then paste filled columns back into the Neo sheet
+5. Re-run the Supabase sync:
 ```bash
-cd /Users/millsrentals/Mills-Dashboard
-node --env-file=.env scripts/sync-from-numbers.mjs
+node --env-file=.env scripts/sync-from-neo.mjs
 ```
 
 ### "Dashboard shows 'Local data' (orange dot)"
@@ -381,23 +329,13 @@ The Netlify function is failing. Check:
 
 ### "Data looks stale"
 
-1. Is the external drive mounted? `ls "/Volumes/One Touch/"`
-2. Run sync manually (see above)
-3. Hard refresh the browser (Cmd+Shift+R) - old data may be cached
+1. Run dry-run to see what the sync would change: `node --env-file=.env scripts/sync-from-neo.mjs --dry-run`
+2. If the diff is non-empty, run the live sync
+3. Hard-refresh the browser (Cmd+Shift+R)
 
-### "Column indices are wrong / Numbers file layout changed"
+### "A column was renamed in the Neo sheet"
 
-Print current headers:
-```bash
-python3 -c "
-import numbers_parser
-doc = numbers_parser.Document('/Volumes/One Touch/The_Team_Google_Drive Sync/2025-2026 Renewals_Dashboard.numbers')
-for i, c in enumerate(doc.sheets[0].tables[0].rows()[0]):
-    print(f'{i}: {c.value}')
-"
-```
-
-Then update the `S1` constants in `scripts/sync-from-numbers.mjs`.
+Check `--dry-run` output — the `Header map` line shows found-vs-expected counts. To support a new header name, append it to the relevant `headers` array in `src/config/tenantInfoColumns.js` (Tenant Info) or to `HEADER_TO_FIELD` in `src/config/columns.js` (property-info-clean).
 
 ---
 
@@ -424,9 +362,8 @@ Then update the `S1` constants in `scripts/sync-from-numbers.mjs`.
 - **Frontend:** React 18, Vite, deployed on Netlify
 - **API:** Netlify Functions (serverless)
 - **Database:** Supabase (PostgreSQL)
-- **Property Info:** Google Sheets API via service account
-- **Numbers parsing:** `numbers-parser` (Python) for reading/writing `.numbers` files
-- **Sync tooling:** Node.js scripts, Claude Code scheduled tasks
+- **Source-of-truth sheet:** Google Sheets API via service account (Neo Google Sheet)
+- **Sync tooling:** Node.js scripts run by GitHub Actions (daily) + on-demand from the dashboard
 
 ---
 
@@ -447,3 +384,6 @@ Moved tenant data to Supabase for faster reads and a cleaner schema. Added `sync
 4. **GitHub push protection:** Hardcoded Supabase credentials in the sync script blocked pushes. Moved to `.env` file.
 
 5. **Missing phone numbers:** Appfolio has the most complete contact info but Amanda's spreadsheet is the source of truth for everything else. Created `sync-tenant-phones.js` to bridge the gap - backfills blanks without overwriting Amanda's data.
+
+**April 2026 - Neo migration (consolidation):**
+Replaced the two-source split (`.numbers` file + separate Property Info Google Sheet) with a single Neo Google Sheet hosting all four tabs (Tenant Info, property-info-clean, Turnover Inspections, Property Info History). Consolidated `sync-from-numbers.mjs` + `sync-property-cache.mjs` into one `sync-from-neo.mjs` that batchGets both data tabs and writes Supabase in one pass. Added 32 property columns to the `units` table (door codes, appliance service records, paint, portfolio, lead paint) so all sheet fields are persisted. Renamed property `Notes` field to `unit_notes` to disambiguate from resident notes. Hard fail-loud rules: missing required header → exit before write; any unresolved Tenant address → exit before resident delete. Dropped the `numbers-parser` Python dependency entirely. The legacy `.numbers` file remains in Drive as a frozen backup.
