@@ -5,10 +5,13 @@
 // Usage: node scripts/meeting-capture/status-server.js
 // Then open http://localhost:2626 in a browser
 
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { spawn } = require('child_process');
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PORT = 2626;
 const PID_FILE = '/tmp/meetings/recording.pid';
