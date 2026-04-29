@@ -1,9 +1,9 @@
 /**
  * Netlify Function: GET /api/get-inspection?address=...
  *
- * Returns the most recent inspection for a unit_address, in the legacy shape
- * TurnoverTab.jsx expects. Phase 1A reads items_json off the inspection row;
- * Phase 1C will switch reads over to inspection_items.
+ * Returns the most recent inspection for a unit_address. Carries both the
+ * legacy `items` blob (for the existing Edit form) and the normalized
+ * `rows` array of inspection_items (for the Phase 1C Overview Gather + Tasks).
  *
  * Local curl example:
  *   curl 'http://localhost:8888/api/get-inspection?address=123%20Main%20St'
@@ -14,6 +14,9 @@
  *       "overallCondition": "up_to_date",
  *       "overallNotes": "...",
  *       "items": { "blinds": [...], "conditions": {...}, ... },
+ *       "rows": [ { "id": "...", "category": "blinds", "item_type": "purchase",
+ *                   "payload": { ... }, "needs_this": true,
+ *                   "gathered_at": null, "done_at": null, "done_by": null }, ... ],
  *       "status": "complete"
  *     } }
  *   No inspection found → 200 { "inspection": null }
@@ -60,6 +63,13 @@ export async function handler(event) {
     }
 
     const row = data[0];
+
+    const { data: itemRows, error: itemsErr } = await supabase
+      .from('inspection_items')
+      .select('id, category, item_type, payload, needs_this, gathered_at, done_at, done_by')
+      .eq('inspection_id', row.id);
+    if (itemsErr) throw new Error(`fetch items: ${itemsErr.message}`);
+
     const inspection = {
       id:               row.id,
       address:          row.unit_address || '',
@@ -68,12 +78,13 @@ export async function handler(event) {
       overallCondition: row.overall_condition || '',
       overallNotes:     row.overall_notes || '',
       items:            row.items_json || {},
+      rows:             itemRows || [],
       status:           row.status || 'complete',
       turnoverYear:     row.turnover_year || null,
       timestamp:        row.updated_at || row.created_at || '',
     };
 
-    console.log(`[get-inspection] OK — "${address}" | ${Date.now() - t0}ms`);
+    console.log(`[get-inspection] OK — "${address}" | ${itemRows?.length || 0} items | ${Date.now() - t0}ms`);
 
     return {
       statusCode: 200,

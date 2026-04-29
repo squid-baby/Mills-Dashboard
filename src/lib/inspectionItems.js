@@ -6,16 +6,18 @@
  *   - netlify/functions/save-inspection.js  (write side: items → rows)
  *   - scripts/migrate-inspections-sheet-to-supabase.mjs  (write side, with phantom filtering)
  *
- * Phase 1A only writes inspection_items; reads continue to use items_json
- * stored on the inspections row. Phase 1C will switch reads over and drop
- * items_json entirely.
+ * Phase 1C: per-entry `needs_this` + (custom-only) `purchaseNeeded` are
+ * stripped off the entry and surface as top-level row columns. `payload`
+ * holds only the category-specific fields. `item_type` for `custom` becomes
+ * 'work' when `purchaseNeeded === false`, otherwise 'purchase'.
  *
  * Item shape conventions:
- *   { category, item_type, payload }
+ *   { category, item_type, payload, needs_this }
  *   - category: 'blinds' | 'bulbs' | 'stove_parts' | 'toilet_seats' | 'outlets'
  *               | 'detectors' | 'keys' | 'paint' | 'condition' | 'custom'
  *   - item_type: 'purchase' (orderable goods) | 'work' (tasks done on-site)
  *   - payload: jsonb, fields specific to the category
+ *   - needs_this: boolean — drives Overview's Gather/Tasks filtering and Worklist
  */
 
 // ─── Phantom-default seeds ───────────────────────────────────────────────────
@@ -53,13 +55,22 @@ export function isPhantomRow(row, category) {
 // ─── Items blob → inspection_items rows ──────────────────────────────────────
 
 /**
+ * splitEntry — pull `needs_this` (and `purchaseNeeded` for custom) off an entry,
+ * returning the top-level row fields + a clean payload. Pure helper.
+ */
+function splitEntry(entry, category) {
+  const { needs_this = false, purchaseNeeded, ...payload } = entry;
+  return { needs_this: !!needs_this, purchaseNeeded, payload };
+}
+
+/**
  * itemsToRows — flatten a TurnoverTab `items` blob into normalized rows.
  *
  * @param {object} items   — the legacy blob from TurnoverTab state
  * @param {string} address — unit_address (denormalized onto each row)
  * @param {object} opts
  * @param {boolean} opts.skipPhantoms — backfill passes true; live save passes false
- * @returns {Array<{category, item_type, payload, unit_address}>}
+ * @returns {Array<{category, item_type, payload, needs_this, unit_address}>}
  */
 export function itemsToRows(items, address, { skipPhantoms = false } = {}) {
   const rows = [];
@@ -70,11 +81,14 @@ export function itemsToRows(items, address, { skipPhantoms = false } = {}) {
     for (const entry of arr) {
       if (!entry || typeof entry !== 'object') continue;
       if (skipPhantoms && isPhantomRow(entry, category)) continue;
+      const { needs_this, purchaseNeeded, payload } = splitEntry(entry, category);
+      const resolvedType = category === 'custom' && purchaseNeeded === false ? 'work' : itemType;
       rows.push({
         unit_address: address,
         category,
-        item_type: itemType,
-        payload: entry,
+        item_type: resolvedType,
+        payload,
+        needs_this,
       });
     }
   };
@@ -93,31 +107,36 @@ export function itemsToRows(items, address, { skipPhantoms = false } = {}) {
     for (const entry of items.detectors) {
       if (!entry || typeof entry !== 'object') continue;
       if (Number(entry.qty) <= 0) continue;
-      rows.push({ unit_address: address, category: 'detectors', item_type: 'purchase', payload: entry });
+      const { needs_this, payload } = splitEntry(entry, 'detectors');
+      rows.push({ unit_address: address, category: 'detectors', item_type: 'purchase', payload, needs_this });
     }
   } else if (items.detectors && typeof items.detectors === 'object' && Number(items.detectors.qty) > 0) {
     // legacy: single-object shape from inspections saved before the array conversion
+    const { needs_this, payload } = splitEntry(items.detectors, 'detectors');
     rows.push({
       unit_address: address,
       category: 'detectors',
       item_type: 'purchase',
-      payload: items.detectors,
+      payload,
+      needs_this,
     });
   }
 
   // conditions is a flat object keyed by item label; flatten to one row per item
-  // that actually carries a condition or a note (skip untouched entries)
+  // that actually carries a condition, a note, or needs_this (skip untouched entries)
   if (items.conditions && typeof items.conditions === 'object') {
     for (const [label, val] of Object.entries(items.conditions)) {
       if (!val || typeof val !== 'object') continue;
       const condition = val.condition || null;
       const notes = val.notes || '';
-      if (!condition && !notes.trim()) continue;
+      const needs_this = !!val.needs_this;
+      if (!condition && !notes.trim() && !needs_this) continue;
       rows.push({
         unit_address: address,
         category: 'condition',
         item_type: 'work',
         payload: { item: label, condition, notes },
+        needs_this,
       });
     }
   }
