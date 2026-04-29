@@ -6,6 +6,7 @@ import DetailPanel from './components/DetailPanel';
 import SummaryBar from './components/SummaryBar';
 import GroupHeader from './components/GroupHeader';
 import CalendarView from './components/calendar/CalendarView';
+import WorklistView from './components/WorklistView';
 
 const POLL_INTERVAL = 30 * 60 * 1000; // 30 minutes
 const CACHE_KEY = 'mills_units_cache';
@@ -167,7 +168,8 @@ export default function App() {
     localStorage.setItem('mills_theme', theme);
   }, [theme]);
 
-  const [view, setView] = useState('dashboard'); // 'dashboard' | 'calendar'
+  const [view, setView] = useState('dashboard'); // 'dashboard' | 'calendar' | 'worklist'
+  const [worklistInitialAddress, setWorklistInitialAddress] = useState('');
   const [units, setUnits] = useState(() => loadCache()?.units ?? SEED_UNITS);
   const [dataSource, setDataSource] = useState(() => loadCache() ? 'cached' : 'local');
   const [lastSynced, setLastSynced] = useState(() => {
@@ -332,6 +334,19 @@ export default function App() {
     );
   }
 
+  // ── Worklist view ─────────────────────────────────────────────────────────
+  if (view === 'worklist') {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg-root)', color: 'var(--text-primary)' }}>
+        <WorklistView
+          initialAddress={worklistInitialAddress}
+          themeButton={themeButton}
+          onBack={() => { setWorklistInitialAddress(''); setView('dashboard'); }}
+        />
+      </div>
+    );
+  }
+
   // ── Dashboard view ────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-root)', color: 'var(--text-primary)' }}>
@@ -352,7 +367,16 @@ export default function App() {
 
       {/* Detail panel */}
       {selectedUnit && (
-        <DetailPanel unit={selectedUnit} onClose={() => setSelectedId(null)} theme={theme} />
+        <DetailPanel
+          unit={selectedUnit}
+          onClose={() => setSelectedId(null)}
+          theme={theme}
+          onOpenWorklist={(address) => {
+            setSelectedId(null);
+            setWorklistInitialAddress(address || '');
+            setView('worklist');
+          }}
+        />
       )}
 
       {/* Header — Dashboard mode */}
@@ -465,6 +489,25 @@ export default function App() {
                 }}
               />
             </div>
+
+            <button
+              onClick={() => setView('worklist')}
+              style={{
+                background: 'transparent',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-default)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '6px 14px',
+                fontSize: 12, fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all var(--duration-fast) ease',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              Worklist
+            </button>
 
             <button
               onClick={() => setView('calendar')}

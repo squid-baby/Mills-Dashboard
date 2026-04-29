@@ -4,7 +4,7 @@ import StatusBadge from './StatusBadge';
 import PropertyInfoTab from './PropertyInfoTab';
 import TurnoverTab from './TurnoverTab';
 
-export default function DetailPanel({ unit, onClose, theme = 'dark' }) {
+export default function DetailPanel({ unit, onClose, theme = 'dark', onOpenWorklist }) {
   const [noteText, setNoteText] = useState('');
   const [localNotes, setLocalNotes] = useState([]);
   const [notesLoading, setNotesLoading] = useState(true);
@@ -396,7 +396,7 @@ export default function DetailPanel({ unit, onClose, theme = 'dark' }) {
 
         {activeTab === 'turnover' && (
           <div style={{ animation: 'fadeIn 200ms ease' }}>
-            <TurnoverTab unit={unit} accentColor={c.color} />
+            <TurnoverTab unit={unit} accentColor={c.color} onOpenWorklist={onOpenWorklist} />
           </div>
         )}
       </div>

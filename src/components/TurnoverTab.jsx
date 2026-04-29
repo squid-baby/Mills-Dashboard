@@ -7,7 +7,7 @@ import {
   DETECTOR_TYPES, KEY_TYPES,
   PAINT_LOCATIONS, PAINT_COLORS, PAINT_FINISHES,
   CONDITION_GROUPS, OVERALL_CONDITIONS,
-  sectionForConditionItem,
+  sectionForConditionItem, CATEGORY_LABELS, summarizeRow,
 } from '../config/turnoverOptions';
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
@@ -92,7 +92,7 @@ const toggleBaseStyle = {
 };
 
 // ─── Top-level component ─────────────────────────────────────────────────────
-export default function TurnoverTab({ unit, accentColor }) {
+export default function TurnoverTab({ unit, accentColor, onOpenWorklist }) {
   const [view, setView] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -319,6 +319,7 @@ export default function TurnoverTab({ unit, accentColor }) {
           overallCondition={overallCondition}
           onToggle={toggleRowField}
           onEditClick={() => setView('edit')}
+          onOpenWorklist={onOpenWorklist ? () => onOpenWorklist(unit.address) : null}
         />
       )}
     </div>
@@ -327,40 +328,7 @@ export default function TurnoverTab({ unit, accentColor }) {
 
 // ─── Overview (read-only Gather + Tasks) ─────────────────────────────────────
 
-const CATEGORY_LABELS = {
-  blinds: 'Blinds',
-  bulbs: 'Bulbs',
-  stove_parts: 'Stove parts',
-  toilet_seats: 'Toilet seats',
-  outlets: 'Outlets / switches',
-  detectors: 'Smoke / CO',
-  keys: 'Keys / fobs',
-  custom: 'Other',
-  paint: 'Paint',
-  condition: 'Inspection',
-};
-
-function summarizeRow(row) {
-  const p = row.payload || {};
-  switch (row.category) {
-    case 'blinds':       return `${p.qty || 1}× Blinds ${p.width || ''} × ${p.drop || ''}`;
-    case 'bulbs':        return `${p.qty || 1}× ${p.type || 'Bulb'}${p.temp ? ` — ${p.temp}` : ''}`;
-    case 'stove_parts':  return `${p.qty || 1}× ${p.type || 'Stove part'}${p.brand ? ` (${p.brand})` : ''}`;
-    case 'toilet_seats': return `${p.qty || 1}× Toilet seat — ${p.shape || ''}`;
-    case 'outlets':      return `${p.qty || 1}× ${p.type || ''}${p.color ? ` ${p.color}` : ''}${p.gang ? ` ${p.gang}` : ''}`;
-    case 'detectors':    return `${p.qty || 1}× ${p.type || 'Detector'}`;
-    case 'keys':         return `${p.type || 'Key'} — returned ${p.returned ?? 0}, missing ${p.missing ?? 0}`;
-    case 'custom':       return `${p.qty || 1}× ${p.name || '(unnamed)'}${p.spec ? ` — ${p.spec}` : ''}`;
-    case 'paint': {
-      const color = p.color === 'Other' ? (p.customColor || 'Other') : (p.color || '');
-      return `${p.location || ''}${color ? ` — ${color}` : ''}${p.finish ? ` (${p.finish})` : ''}`;
-    }
-    case 'condition':    return `${p.item || ''}${p.condition ? ` — ${p.condition}` : ''}`;
-    default:             return JSON.stringify(p);
-  }
-}
-
-function TurnoverOverview({ rows, inspectionId, inspectionDate, inspector, overallCondition, onToggle, onEditClick }) {
+function TurnoverOverview({ rows, inspectionId, inspectionDate, inspector, overallCondition, onToggle, onEditClick, onOpenWorklist }) {
   if (!inspectionId) {
     return (
       <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, fontStyle: 'italic' }}>
@@ -452,10 +420,15 @@ function TurnoverOverview({ rows, inspectionId, inspectionDate, inspector, overa
         ))
       )}
 
-      <div style={{ marginTop: 24, textAlign: 'center' }}>
+      <div style={{ marginTop: 24, display: 'flex', justifyContent: 'center', gap: 8 }}>
         <button onClick={onEditClick} style={{ ...addBtnStyle, width: 'auto', padding: '6px 16px' }}>
           Edit inspection
         </button>
+        {onOpenWorklist && needsRows.length > 0 && (
+          <button onClick={onOpenWorklist} style={{ ...addBtnStyle, width: 'auto', padding: '6px 16px' }}>
+            Open in Worklist →
+          </button>
+        )}
       </div>
     </div>
   );

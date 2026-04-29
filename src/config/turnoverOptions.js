@@ -81,3 +81,57 @@ export function sectionForConditionItem(itemLabel) {
   }
   return 'Other';
 }
+
+// Display label per inspection_items.category.
+export const CATEGORY_LABELS = {
+  blinds: 'Blinds',
+  bulbs: 'Bulbs',
+  stove_parts: 'Stove parts',
+  toilet_seats: 'Toilet seats',
+  outlets: 'Outlets / switches',
+  detectors: 'Smoke / CO',
+  keys: 'Keys / fobs',
+  custom: 'Other',
+  paint: 'Paint',
+  condition: 'Inspection',
+};
+
+// One-line summary of an inspection_items row for the Overview / Worklist UIs.
+// Pure function — same input always renders the same string.
+export function summarizeRow(row) {
+  const p = row.payload || {};
+  switch (row.category) {
+    case 'blinds':       return `${p.qty || 1}× Blinds ${p.width || ''} × ${p.drop || ''}`;
+    case 'bulbs':        return `${p.qty || 1}× ${p.type || 'Bulb'}${p.temp ? ` — ${p.temp}` : ''}`;
+    case 'stove_parts':  return `${p.qty || 1}× ${p.type || 'Stove part'}${p.brand ? ` (${p.brand})` : ''}`;
+    case 'toilet_seats': return `${p.qty || 1}× Toilet seat — ${p.shape || ''}`;
+    case 'outlets':      return `${p.qty || 1}× ${p.type || ''}${p.color ? ` ${p.color}` : ''}${p.gang ? ` ${p.gang}` : ''}`;
+    case 'detectors':    return `${p.qty || 1}× ${p.type || 'Detector'}`;
+    case 'keys':         return `${p.type || 'Key'} — returned ${p.returned ?? 0}, missing ${p.missing ?? 0}`;
+    case 'custom':       return `${p.qty || 1}× ${p.name || '(unnamed)'}${p.spec ? ` — ${p.spec}` : ''}`;
+    case 'paint': {
+      const color = p.color === 'Other' ? (p.customColor || 'Other') : (p.color || '');
+      return `${p.location || ''}${color ? ` — ${color}` : ''}${p.finish ? ` (${p.finish})` : ''}`;
+    }
+    case 'condition':    return `${p.item || ''}${p.condition ? ` — ${p.condition}` : ''}`;
+    default:             return JSON.stringify(p);
+  }
+}
+
+// Stable shopping-list key — rolls multiple matching rows into one row with summed qty.
+// e.g. 3× "Blinds 23\" × 36\"" + 2× "Blinds 23\" × 36\"" → 5× "Blinds 23\" × 36\""
+// Returns the same string regardless of qty / address / done state.
+export function shoppingKey(row) {
+  const p = row.payload || {};
+  switch (row.category) {
+    case 'blinds':       return `blinds|${p.width || ''}|${p.drop || ''}`;
+    case 'bulbs':        return `bulbs|${p.type || ''}|${p.temp || ''}`;
+    case 'stove_parts':  return `stove_parts|${p.type || ''}|${p.brand || ''}`;
+    case 'toilet_seats': return `toilet_seats|${p.shape || ''}`;
+    case 'outlets':      return `outlets|${p.type || ''}|${p.color || ''}|${p.gang || ''}`;
+    case 'detectors':    return `detectors|${p.type || ''}`;
+    case 'keys':         return `keys|${p.type || ''}`;
+    case 'custom':       return `custom|${p.name || ''}|${p.spec || ''}`;
+    default:             return `${row.category}|${JSON.stringify(p)}`;
+  }
+}
