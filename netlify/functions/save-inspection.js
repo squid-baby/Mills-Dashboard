@@ -1,23 +1,27 @@
 /**
  * Netlify Function: POST /api/save-inspection
  *
- * Saves a turnover inspection to the "Turnover Inspections" tab
- * in the Property Info Google Sheet.
+ * Upserts a turnover inspection into Supabase. One row per unit_address —
+ * latest save wins (replace semantics). Also normalizes the items blob into
+ * `inspection_items` rows for the Worklist + Turnover Overview (Phases 1C–1D).
  *
  * Body: { address, inspection }
  *   inspection: { inspector, date, overallCondition, overallNotes, items: {...} }
  *
- * Schema: Timestamp | Address | Inspector | Date | OverallCondition | OverallNotes | ItemsJSON
+ * Response: { success: true, inspection_id }
+ *
+ * Local curl example:
+ *   curl -X POST http://localhost:8888/api/save-inspection \
+ *     -H 'Content-Type: application/json' \
+ *     -d '{"address":"123 Main St","inspection":{"inspector":"NM","date":"2026-04-29","overallCondition":"up_to_date","overallNotes":"clean","items":{}}}'
+ *   → 200 { "success": true, "inspection_id": "<uuid>" }
  *
  * Required env vars:
- *   GOOGLE_SERVICE_ACCOUNT_JSON
- *   SHEET_ID_PROPERTY_INFO
+ *   SUPABASE_URL, SUPABASE_SERVICE_KEY
  */
 
-import { google } from 'googleapis';
-import { SHEET_TABS } from '../../src/config/columns.js';
-
-const TAB_NAME = SHEET_TABS.INSPECTIONS;
+import { createClient } from '@supabase/supabase-js';
+import { itemsToRows } from '../../src/lib/inspectionItems.js';
 
 export async function handler(event) {
   if (event.httpMethod !== 'POST') {
@@ -33,105 +37,84 @@ export async function handler(event) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing address or inspection data' }) };
   }
 
-  const { GOOGLE_SERVICE_ACCOUNT_JSON, SHEET_ID_PROPERTY_INFO } = process.env;
-  if (!GOOGLE_SERVICE_ACCOUNT_JSON || !SHEET_ID_PROPERTY_INFO) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'Missing credentials or sheet ID' }) };
+  const { SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env;
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    return { statusCode: 500, body: JSON.stringify({ error: 'Missing Supabase credentials' }) };
   }
 
   const t0 = Date.now();
   try {
-    const credentials = JSON.parse(GOOGLE_SERVICE_ACCOUNT_JSON);
-    const auth = new google.auth.GoogleAuth({
-      credentials,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
-    const sheets = google.sheets({ version: 'v4', auth });
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-    const itemsJSON = JSON.stringify(inspection.items || {});
+    const items = inspection.items || {};
+    const inspectionDate = inspection.date || new Date().toISOString().split('T')[0];
+    const turnoverYear = parseInt((inspectionDate.match(/^(\d{4})/) || [])[1], 10) || null;
 
-    // Check if an inspection already exists for this address — update if so
-    let existingRowIndex = -1;
-    try {
-      const existing = await sheets.spreadsheets.values.get({
-        spreadsheetId: SHEET_ID_PROPERTY_INFO,
-        range: `${TAB_NAME}!B:B`,
-      });
-      const rows = existing.data.values || [];
-      for (let i = 1; i < rows.length; i++) {
-        if ((rows[i]?.[0] || '').toString().trim() === address) {
-          existingRowIndex = i + 1; // 1-based
-          break;
-        }
-      }
-    } catch {
-      // Tab doesn't exist yet — will be created by append
-    }
+    const inspectionRow = {
+      unit_address: address,
+      inspector: inspection.inspector || '',
+      inspection_date: inspectionDate,
+      overall_condition: inspection.overallCondition || '',
+      overall_notes: inspection.overallNotes || '',
+      items_json: items,
+      status: inspection.status || 'complete',
+      turnover_year: turnoverYear,
+      updated_at: new Date().toISOString(),
+    };
 
-    const rowData = [
-      new Date().toISOString(),
-      address,
-      inspection.inspector || '',
-      inspection.date || '',
-      inspection.overallCondition || '',
-      inspection.overallNotes || '',
-      itemsJSON,
-    ];
+    // One row per unit_address — find the latest, update if found, else insert.
+    const { data: existing, error: findErr } = await supabase
+      .from('inspections')
+      .select('id')
+      .eq('unit_address', address)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (findErr) throw new Error(`find inspection: ${findErr.message}`);
 
-    if (existingRowIndex > 0) {
-      // Update existing row
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: SHEET_ID_PROPERTY_INFO,
-        range: `${TAB_NAME}!A${existingRowIndex}:G${existingRowIndex}`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: { values: [rowData] },
-      });
+    let inspectionId;
+    if (existing && existing.length > 0) {
+      inspectionId = existing[0].id;
+      const { error } = await supabase
+        .from('inspections')
+        .update(inspectionRow)
+        .eq('id', inspectionId);
+      if (error) throw new Error(`update inspection: ${error.message}`);
     } else {
-      // Append new row (will create tab headers if needed)
-      try {
-        await sheets.spreadsheets.values.append({
-          spreadsheetId: SHEET_ID_PROPERTY_INFO,
-          range: `${TAB_NAME}!A:G`,
-          valueInputOption: 'USER_ENTERED',
-          requestBody: { values: [rowData] },
-        });
-      } catch (appendErr) {
-        // If the tab doesn't exist, create it with headers first
-        if (appendErr.message.includes('Unable to parse range')) {
-          // Add the sheet
-          await sheets.spreadsheets.batchUpdate({
-            spreadsheetId: SHEET_ID_PROPERTY_INFO,
-            requestBody: {
-              requests: [{ addSheet: { properties: { title: TAB_NAME } } }],
-            },
-          });
-          // Add headers
-          await sheets.spreadsheets.values.update({
-            spreadsheetId: SHEET_ID_PROPERTY_INFO,
-            range: `${TAB_NAME}!A1:G1`,
-            valueInputOption: 'USER_ENTERED',
-            requestBody: {
-              values: [['Timestamp', 'Address', 'Inspector', 'Date', 'OverallCondition', 'OverallNotes', 'ItemsJSON']],
-            },
-          });
-          // Now append
-          await sheets.spreadsheets.values.append({
-            spreadsheetId: SHEET_ID_PROPERTY_INFO,
-            range: `${TAB_NAME}!A:G`,
-            valueInputOption: 'USER_ENTERED',
-            requestBody: { values: [rowData] },
-          });
-        } else {
-          throw appendErr;
-        }
-      }
+      const { data, error } = await supabase
+        .from('inspections')
+        .insert(inspectionRow)
+        .select('id')
+        .single();
+      if (error) throw new Error(`insert inspection: ${error.message}`);
+      inspectionId = data.id;
     }
 
-    console.log(`[save-inspection] OK — "${address}" | ${Date.now() - t0}ms`);
+    // Replace the normalized items rows. Live saves don't filter phantoms —
+    // they're whatever the inspector saved. The backfill is the only path
+    // that filters seeds out, so the data lands clean once and stays clean.
+    const { error: delErr } = await supabase
+      .from('inspection_items')
+      .delete()
+      .eq('inspection_id', inspectionId);
+    if (delErr) throw new Error(`delete items: ${delErr.message}`);
+
+    const itemRows = itemsToRows(items, address).map(r => ({
+      ...r,
+      inspection_id: inspectionId,
+    }));
+    if (itemRows.length > 0) {
+      const { error: insErr } = await supabase
+        .from('inspection_items')
+        .insert(itemRows);
+      if (insErr) throw new Error(`insert items: ${insErr.message}`);
+    }
+
+    console.log(`[save-inspection] OK — "${address}" | ${itemRows.length} items | ${Date.now() - t0}ms`);
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ success: true }),
+      body: JSON.stringify({ success: true, inspection_id: inspectionId }),
     };
   } catch (err) {
     console.error(`[save-inspection] ERROR — "${address}" after ${Date.now() - t0}ms:`, err.message);
