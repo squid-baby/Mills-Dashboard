@@ -69,19 +69,22 @@ export default function Tile({ unit, onClick, index = 0, theme = 'dark' }) {
         </div>
       )}
 
-      {/* Inspection condition flag + age label */}
-      {unit._inspectionCondition && (() => {
-        const flagColor =
-          unit._inspectionCondition === 'up_to_date' ? '#34d399' :
-          unit._inspectionCondition === 'needs_love' ? '#fbbf24' :
-          '#f87171';
-        const condText =
-          unit._inspectionCondition === 'up_to_date' ? 'Up to date' :
-          unit._inspectionCondition === 'needs_love' ? 'Needs love' :
-          'At risk';
-        const isDraft = unit._inspectionStatus === 'draft';
+      {/* Inspection age label + condition flag (independent — either or both can show) */}
+      {(() => {
         const ageLabel = formatInspectionAge(unit._inspectionDate);
-        const fullTitle = `Inspection: ${condText}${isDraft ? ' (in progress)' : ''}${ageLabel ? ` · ${ageLabel}` : ''}`;
+        const cond = unit._inspectionCondition;
+        if (!ageLabel && !cond) return null;
+        const isDraft = unit._inspectionStatus === 'draft';
+        const flagColor =
+          cond === 'up_to_date' ? '#34d399' :
+          cond === 'needs_love' ? '#fbbf24' :
+          cond === 'at_risk'    ? '#f87171' : null;
+        const condText =
+          cond === 'up_to_date' ? 'Up to date' :
+          cond === 'needs_love' ? 'Needs love' :
+          cond === 'at_risk'    ? 'At risk'    :
+          'Inspected';
+        const fullTitle = `${condText}${isDraft ? ' (in progress)' : ''}${ageLabel ? ` · ${ageLabel}` : ''}`;
         return (
           <>
             {ageLabel && (
@@ -98,27 +101,29 @@ export default function Tile({ unit, onClick, index = 0, theme = 'dark' }) {
                 {ageLabel}
               </div>
             )}
-            <div
-              title={fullTitle}
-              style={{
-                position: 'absolute',
-                bottom: 0,
-                right: 0,
-                overflow: 'hidden',
-                borderBottomRightRadius: 'var(--radius-md)',
-              }}
-            >
-              {isDraft ? (
-                /* Draft: hollow outline triangle to signal "in progress" */
-                <svg width="22" height="22" viewBox="0 0 22 22">
-                  <polygon points="22,0 22,22 0,22" fill="none" stroke={flagColor} strokeWidth="2" strokeDasharray="3 2" opacity="0.85" />
-                </svg>
-              ) : (
-                <svg width="22" height="22" viewBox="0 0 22 22">
-                  <polygon points="22,0 22,22 0,22" fill={flagColor} opacity="0.85" />
-                </svg>
-              )}
-            </div>
+            {flagColor && (
+              <div
+                title={fullTitle}
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  right: 0,
+                  overflow: 'hidden',
+                  borderBottomRightRadius: 'var(--radius-md)',
+                }}
+              >
+                {isDraft ? (
+                  /* Draft: hollow dashed triangle signals "in progress" */
+                  <svg width="22" height="22" viewBox="0 0 22 22">
+                    <polygon points="22,0 22,22 0,22" fill="none" stroke={flagColor} strokeWidth="2" strokeDasharray="3 2" opacity="0.85" />
+                  </svg>
+                ) : (
+                  <svg width="22" height="22" viewBox="0 0 22 22">
+                    <polygon points="22,0 22,22 0,22" fill={flagColor} opacity="0.85" />
+                  </svg>
+                )}
+              </div>
+            )}
           </>
         );
       })()}
