@@ -112,7 +112,7 @@ Mappings live in `src/config/tenantInfoColumns.js`. Lookup is by **header name**
 | `save-calendar-task` | POST | Upsert calendar task (id present → update, else insert) |
 | `delete-calendar-task` | POST | Delete calendar task by `{ id }` |
 | `trigger-sync` | POST | Dispatches GitHub Actions `sync-neo.yml` workflow via `workflow_dispatch`. Requires `GH_DISPATCH_TOKEN` env var (actions:write scope). Returns `{ ok: true }` on 204 from GitHub. |
-| `recording-status` | GET / POST | Backs the public `/recording.html` page. GET is public; returns `{ recording, since, updatedAt }`. POST is gated by the `X-Recording-Secret` header matching the `RECORDING_SECRET` env var; body `{ recording: bool }`. State stored in a Netlify Blob (`recording-status` store). Pushed by `scripts/meeting-capture/record-meeting.sh` on start/stop. |
+| `recording-status` | GET / POST | Backs the inline REC pill in the dashboard header. GET is public; returns `{ recording, since, updatedAt }`. POST is gated by the `X-Recording-Secret` header matching the `RECORDING_SECRET` env var; body `{ recording: bool }`. State stored in a Netlify Blob (`recording-status` store). Pushed by `scripts/meeting-capture/record-meeting.sh` on start/stop. |
 
 ### Column Config (`src/config/columns.js`)
 Single source of truth for the property-info-clean tab ↔ field key mapping, used by `get-property-info.js`, `update-property-info.js`, and `sync-from-neo.mjs`. **Add new property-side fields here only.**
@@ -205,11 +205,11 @@ Swimlane-style calendar for scheduling turnover work during May–August season.
 - Drag-to-reschedule (mousedown/touchstart → snap to slot on release)
 - Mobile polish (touch targets, full-screen modals, responsive week grid)
 
-## Recording Status Page
+## Recording Status Indicator
 
-Public visual indicator for whether the meeting Mac is currently recording. Andrea's privacy concern: she wants to know when the computer is listening to her, from any device.
+Inline REC pill in the dashboard header (next to the "Synced" indicator) that appears only when the meeting Mac is actively recording. Addresses Andrea's privacy concern: she wants to know when the computer is listening to her, visible wherever she's already looking on the dashboard.
 
-- **Page**: `https://mills-dashboard.netlify.app/recording.html` — full-screen, polls every 3s. Red + pulsing "BIG BROTHER IS LISTENING" when active; green "GO AHEAD AND TALK SHIT" when idle. Read-only (the actual toggle has to come from the Mac, since the page is on every networked device but only the Mac is wired to the mic).
+- **UI**: red pill with blinking dot + "REC" text, rendered in `src/App.jsx` (header indicator block). Hidden when not recording. Polls `/api/recording-status` every 4s. The blinking is driven by `.rec-dot { animation: pulse 1.2s ... }` in `src/index.css` (reuses the existing `@keyframes pulse`).
 - **Function**: `netlify/functions/recording-status.js` — Netlify Blobs storage (no SQL). GET is public, POST requires `X-Recording-Secret` header.
 - **Local-only fallback**: `scripts/meeting-capture/status-server.js` + `status.html` — same UX served on `localhost:2626`, watches `/tmp/meetings/recording.pid` directly. Useful for the Mac itself or a tablet on the same LAN if the cloud is down.
 - **Wiring**: `record-meeting.sh` calls `publish_status true` after starting ffmpeg and `publish_status false` after killing it. Best-effort `curl` (5s timeout, backgrounded with `&`) — never blocks recording even if the network is offline. Requires `RECORDING_STATUS_URL` and `RECORDING_SECRET` in `meeting-capture.env`; if either is missing the function is a no-op.

@@ -184,6 +184,26 @@ export default function App() {
   const [exporting, setExporting] = useState(false);
   const [syncing, setSyncing] = useState(null); // null | 'pending' | 'ok' | 'error'
   const [inspectionConditions, setInspectionConditions] = useState({});
+  const [isRecording, setIsRecording] = useState(false);
+
+  // Poll the recording-status endpoint every 4s so the REC indicator
+  // reflects the meeting Mac's state in near-real-time.
+  useEffect(() => {
+    let cancelled = false;
+    async function check() {
+      try {
+        const res = await fetch('/api/recording-status', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setIsRecording(!!data.recording);
+      } catch {
+        // Silent — endpoint unavailable just means no indicator.
+      }
+    }
+    check();
+    const id = setInterval(check, 4000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   // Poll Google Sheets via Netlify Function
   useEffect(() => {
@@ -427,6 +447,31 @@ export default function App() {
                     display: 'inline-block',
                   }} />
                   Local data{fetchError ? ' ⚠' : ''}
+                </span>
+              )}
+              {isRecording && (
+                <span
+                  title="Meeting recording is active on the Mac"
+                  style={{
+                    fontSize: 11, fontWeight: 700, color: '#f87171',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    letterSpacing: '0.06em',
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    border: '1px solid rgba(248, 113, 113, 0.5)',
+                    background: 'rgba(248, 113, 113, 0.08)',
+                  }}
+                >
+                  <span
+                    className="rec-dot"
+                    style={{
+                      width: 7, height: 7, borderRadius: '50%',
+                      background: '#f87171',
+                      display: 'inline-block',
+                      boxShadow: '0 0 8px rgba(248, 113, 113, 0.9)',
+                    }}
+                  />
+                  REC
                 </span>
               )}
             </div>
