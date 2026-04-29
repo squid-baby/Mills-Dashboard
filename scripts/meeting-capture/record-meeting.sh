@@ -25,6 +25,21 @@ DEVICE="${ANKER_DEVICE:-PowerConf S3}"
 
 mkdir -p /tmp/meetings
 
+# Push recording state to the public status page (best-effort, never blocks).
+# Requires RECORDING_STATUS_URL + RECORDING_SECRET in meeting-capture.env.
+publish_status() {
+  local recording="$1"  # "true" or "false"
+  if [ -z "$RECORDING_STATUS_URL" ] || [ -z "$RECORDING_SECRET" ]; then
+    return 0
+  fi
+  curl -fsS --max-time 5 \
+    -X POST "$RECORDING_STATUS_URL" \
+    -H "Content-Type: application/json" \
+    -H "X-Recording-Secret: $RECORDING_SECRET" \
+    -d "{\"recording\": $recording}" \
+    >> "$LOG_FILE" 2>&1 &
+}
+
 if [ -f "$PID_FILE" ]; then
   # ── Second press: stop recording and launch pipeline ────────────────────────
   say "What a lovely gathering of the minds — meeting adjourned"
@@ -32,6 +47,8 @@ if [ -f "$PID_FILE" ]; then
   WAV_FILE=$(cat "$WAV_PATH_FILE" 2>/dev/null)
   kill "$(cat "$PID_FILE")" 2>/dev/null
   rm -f "$PID_FILE"
+
+  publish_status "false"
 
   echo "[$(date)] Recording stopped. Launching pipeline for: $WAV_FILE" >> "$LOG_FILE"
 
@@ -52,4 +69,6 @@ else
 
   echo $! > "$PID_FILE"
   echo "[$(date)] Recording started: $OUTPUT_FILE (ffmpeg PID $!)" >> "$LOG_FILE"
+
+  publish_status "true"
 fi
