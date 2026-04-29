@@ -119,7 +119,7 @@ export default function TurnoverTab({ unit, accentColor }) {
   const [toiletSeats, setToiletSeats] = useState([]);
   const [outlets, setOutlets] = useState([]);
   const [detectors, setDetectors] = useState({ type: 'Smoke only', qty: 0 });
-  const [keys, setKeys] = useState([{ type: 'Door key', returned: 0, missing: 0 }]);
+  const [keys, setKeys] = useState([]);
   const [customItems, setCustomItems] = useState([]);
 
   // Paint state
