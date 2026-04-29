@@ -1,6 +1,19 @@
 import { useState } from 'react';
 import { getGC, getAlerts } from '../data/units';
 
+function formatInspectionAge(isoDate) {
+  if (!isoDate) return '';
+  const d = new Date(isoDate.length === 10 ? isoDate + 'T00:00:00' : isoDate);
+  if (isNaN(d)) return '';
+  const days = Math.floor((Date.now() - d.getTime()) / 864e5);
+  if (days < 0) return '';                       // future-dated, treat as no age
+  if (days === 0) return 'today';
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
+}
+
 export default function Tile({ unit, onClick, index = 0, theme = 'dark' }) {
   const [hovered, setHovered] = useState(false);
   const palette = getGC(theme);
@@ -56,31 +69,57 @@ export default function Tile({ unit, onClick, index = 0, theme = 'dark' }) {
         </div>
       )}
 
-      {/* Inspection condition flag */}
+      {/* Inspection condition flag + age label */}
       {unit._inspectionCondition && (() => {
         const flagColor =
           unit._inspectionCondition === 'up_to_date' ? '#34d399' :
           unit._inspectionCondition === 'needs_love' ? '#fbbf24' :
           '#f87171';
-        const flagLabel =
-          unit._inspectionCondition === 'up_to_date' ? 'Inspection: Up to date' :
-          unit._inspectionCondition === 'needs_love' ? 'Inspection: Needs love' :
-          'Inspection: At risk';
+        const condText =
+          unit._inspectionCondition === 'up_to_date' ? 'Up to date' :
+          unit._inspectionCondition === 'needs_love' ? 'Needs love' :
+          'At risk';
+        const isDraft = unit._inspectionStatus === 'draft';
+        const ageLabel = formatInspectionAge(unit._inspectionDate);
+        const fullTitle = `Inspection: ${condText}${isDraft ? ' (in progress)' : ''}${ageLabel ? ` · ${ageLabel}` : ''}`;
         return (
-          <div
-            title={flagLabel}
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              right: 0,
-              overflow: 'hidden',
-              borderBottomRightRadius: 'var(--radius-md)',
-            }}
-          >
-            <svg width="22" height="22" viewBox="0 0 22 22">
-              <polygon points="22,0 22,22 0,22" fill={flagColor} opacity="0.85" />
-            </svg>
-          </div>
+          <>
+            {ageLabel && (
+              <div
+                title={fullTitle}
+                style={{
+                  position: 'absolute', bottom: 4, right: 6,
+                  fontSize: 10, fontWeight: 600,
+                  color: 'var(--text-dim)',
+                  fontVariantNumeric: 'tabular-nums',
+                  pointerEvents: 'none',
+                }}
+              >
+                {ageLabel}
+              </div>
+            )}
+            <div
+              title={fullTitle}
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                right: 0,
+                overflow: 'hidden',
+                borderBottomRightRadius: 'var(--radius-md)',
+              }}
+            >
+              {isDraft ? (
+                /* Draft: hollow outline triangle to signal "in progress" */
+                <svg width="22" height="22" viewBox="0 0 22 22">
+                  <polygon points="22,0 22,22 0,22" fill="none" stroke={flagColor} strokeWidth="2" strokeDasharray="3 2" opacity="0.85" />
+                </svg>
+              ) : (
+                <svg width="22" height="22" viewBox="0 0 22 22">
+                  <polygon points="22,0 22,22 0,22" fill={flagColor} opacity="0.85" />
+                </svg>
+              )}
+            </div>
+          </>
         );
       })()}
 

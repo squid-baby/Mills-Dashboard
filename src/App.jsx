@@ -123,7 +123,7 @@ async function exportTurnoverData(units, inspectionConditions) {
       daysSince(insp?.date),
       insp?.inspector || '',
       insp?.status || '',
-      conditionLabel(inspectionConditions[u.address] || ''),
+      conditionLabel(inspectionConditions[u.address]?.condition || ''),
       gather.length - gatherDone,
       gatherDone,
       tasks.length - tasksDone,
@@ -214,12 +214,17 @@ export default function App() {
       .catch(() => { /* ignore */ });
   }, [units]); // re-fetch when units refresh
 
-  // Enrich units with inspection conditions
+  // Enrich units with inspection condition + date + status
   const enriched = useMemo(() =>
-    units.map(u => ({
-      ...u,
-      _inspectionCondition: inspectionConditions[u.address] || null,
-    })),
+    units.map(u => {
+      const insp = inspectionConditions[u.address];
+      return {
+        ...u,
+        _inspectionCondition: insp?.condition || null,
+        _inspectionDate:      insp?.date      || null,
+        _inspectionStatus:    insp?.status    || null,
+      };
+    }),
     [units, inspectionConditions]
   );
 
