@@ -118,7 +118,7 @@ export default function TurnoverTab({ unit, accentColor }) {
   const [stoveParts, setStoveParts] = useState([]);
   const [toiletSeats, setToiletSeats] = useState([]);
   const [outlets, setOutlets] = useState([]);
-  const [detectors, setDetectors] = useState({ type: 'Smoke only', qty: 0 });
+  const [detectors, setDetectors] = useState([]);
   const [keys, setKeys] = useState([]);
   const [customItems, setCustomItems] = useState([]);
 
@@ -156,7 +156,11 @@ export default function TurnoverTab({ unit, accentColor }) {
             if (d.items.stoveParts?.length) setStoveParts(d.items.stoveParts);
             if (d.items.toiletSeats?.length) setToiletSeats(d.items.toiletSeats);
             if (d.items.outlets?.length) setOutlets(d.items.outlets);
-            if (d.items.detectors) setDetectors(d.items.detectors);
+            if (Array.isArray(d.items.detectors)) {
+              if (d.items.detectors.length) setDetectors(d.items.detectors);
+            } else if (d.items.detectors && typeof d.items.detectors === 'object' && Number(d.items.detectors.qty) > 0) {
+              setDetectors([d.items.detectors]); // legacy: single object pre-array conversion
+            }
             if (d.items.keys?.length) setKeys(d.items.keys);
             if (d.items.customItems?.length) setCustomItems(d.items.customItems);
             if (d.items.paintRows?.length) setPaintRows(d.items.paintRows);
@@ -283,10 +287,13 @@ export default function TurnoverTab({ unit, accentColor }) {
 
       {/* Smoke / CO detectors */}
       <ReplacementBlock title="Smoke / CO detectors">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6 }}>
-          <Field label="Type"><Select value={detectors.type} options={DETECTOR_TYPES} onChange={v => setDetectors(p => ({ ...p, type: v }))} /></Field>
-          <Field label="Qty"><input type="number" min="0" style={qtyStyle} value={detectors.qty} onChange={e => setDetectors(p => ({ ...p, qty: +e.target.value }))} /></Field>
-        </div>
+        {detectors.map((d, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, marginBottom: 6 }}>
+            <Field label="Type"><Select value={d.type} options={DETECTOR_TYPES} onChange={v => updateList(setDetectors, i, 'type', v)} /></Field>
+            <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={d.qty} onChange={e => updateList(setDetectors, i, 'qty', +e.target.value)} /></Field>
+          </div>
+        ))}
+        <button style={addBtnStyle} onClick={() => setDetectors(p => [...p, { type: DETECTOR_TYPES[0], qty: 1 }])}>+ add type</button>
       </ReplacementBlock>
 
       {/* Keys / fobs */}

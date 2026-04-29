@@ -88,8 +88,15 @@ export function itemsToRows(items, address, { skipPhantoms = false } = {}) {
   pushArray(items.customItems,  'custom',       'purchase');
   pushArray(items.paintRows,    'paint',        'work');
 
-  // detectors is a single object, not an array
-  if (items.detectors && typeof items.detectors === 'object' && Number(items.detectors.qty) > 0) {
+  // detectors: array (current shape). Skip qty=0 entries — they're empty placeholders.
+  if (Array.isArray(items.detectors)) {
+    for (const entry of items.detectors) {
+      if (!entry || typeof entry !== 'object') continue;
+      if (Number(entry.qty) <= 0) continue;
+      rows.push({ unit_address: address, category: 'detectors', item_type: 'purchase', payload: entry });
+    }
+  } else if (items.detectors && typeof items.detectors === 'object' && Number(items.detectors.qty) > 0) {
+    // legacy: single-object shape from inspections saved before the array conversion
     rows.push({
       unit_address: address,
       category: 'detectors',
