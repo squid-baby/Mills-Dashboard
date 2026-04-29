@@ -112,12 +112,12 @@ export default function TurnoverTab({ unit, accentColor }) {
   const [inspectorName, setInspectorName] = useState('');
   const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Replacement items state
-  const [blinds, setBlinds] = useState([{ width: '23"', drop: '36"', qty: 1 }]);
-  const [bulbs, setBulbs] = useState([{ type: BULB_TYPES[0], temp: BULB_TEMPS[0], qty: 1 }]);
-  const [stoveParts, setStoveParts] = useState([{ type: STOVE_TYPES[0], brand: '', qty: 1 }]);
-  const [toiletSeats, setToiletSeats] = useState([{ shape: 'Round', qty: 1 }]);
-  const [outlets, setOutlets] = useState([{ type: OUTLET_TYPES[0], color: 'White', gang: '1-gang', qty: 1 }]);
+  // Replacement items state — start empty; inspector clicks "+ add" to record actual items.
+  const [blinds, setBlinds] = useState([]);
+  const [bulbs, setBulbs] = useState([]);
+  const [stoveParts, setStoveParts] = useState([]);
+  const [toiletSeats, setToiletSeats] = useState([]);
+  const [outlets, setOutlets] = useState([]);
   const [detectors, setDetectors] = useState({ type: 'Smoke only', qty: 0 });
   const [keys, setKeys] = useState([{ type: 'Door key', returned: 0, missing: 0 }]);
   const [customItems, setCustomItems] = useState([]);
