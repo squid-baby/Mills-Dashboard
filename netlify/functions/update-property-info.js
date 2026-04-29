@@ -58,7 +58,7 @@ export async function handler(event) {
     // Read header row + address column to find row and column positions
     const headerRes = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID_PROPERTY_INFO,
-      range: `${SHEET_TABS.PROPERTY_INFO}!A1:AZ1`,
+      range: `${SHEET_TABS.PROPERTY_INFO}!A1:ZZ1`,
     });
     const headers = headerRes.data.values?.[0] || [];
 

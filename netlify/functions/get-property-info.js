@@ -40,7 +40,7 @@ export async function handler(event) {
     const [infoRes, historyRes] = await Promise.allSettled([
       sheets.spreadsheets.values.get({
         spreadsheetId: SHEET_ID_PROPERTY_INFO,
-        range: `${SHEET_TABS.PROPERTY_INFO}!A:AZ`,
+        range: `${SHEET_TABS.PROPERTY_INFO}!A:ZZ`,
       }),
       sheets.spreadsheets.values.get({
         spreadsheetId: SHEET_ID_PROPERTY_INFO,

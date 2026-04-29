@@ -112,14 +112,14 @@ export default function TurnoverTab({ unit, accentColor }) {
   const [inspectorName, setInspectorName] = useState('');
   const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Replacement items state
-  const [blinds, setBlinds] = useState([{ width: '23"', drop: '36"', qty: 1 }]);
-  const [bulbs, setBulbs] = useState([{ type: BULB_TYPES[0], temp: BULB_TEMPS[0], qty: 1 }]);
-  const [stoveParts, setStoveParts] = useState([{ type: STOVE_TYPES[0], brand: '', qty: 1 }]);
-  const [toiletSeats, setToiletSeats] = useState([{ shape: 'Round', qty: 1 }]);
-  const [outlets, setOutlets] = useState([{ type: OUTLET_TYPES[0], color: 'White', gang: '1-gang', qty: 1 }]);
-  const [detectors, setDetectors] = useState({ type: 'Smoke only', qty: 0 });
-  const [keys, setKeys] = useState([{ type: 'Door key', returned: 0, missing: 0 }]);
+  // Replacement items state — start empty; inspector clicks "+ add" to record actual items.
+  const [blinds, setBlinds] = useState([]);
+  const [bulbs, setBulbs] = useState([]);
+  const [stoveParts, setStoveParts] = useState([]);
+  const [toiletSeats, setToiletSeats] = useState([]);
+  const [outlets, setOutlets] = useState([]);
+  const [detectors, setDetectors] = useState([]);
+  const [keys, setKeys] = useState([]);
   const [customItems, setCustomItems] = useState([]);
 
   // Paint state
@@ -156,7 +156,11 @@ export default function TurnoverTab({ unit, accentColor }) {
             if (d.items.stoveParts?.length) setStoveParts(d.items.stoveParts);
             if (d.items.toiletSeats?.length) setToiletSeats(d.items.toiletSeats);
             if (d.items.outlets?.length) setOutlets(d.items.outlets);
-            if (d.items.detectors) setDetectors(d.items.detectors);
+            if (Array.isArray(d.items.detectors)) {
+              if (d.items.detectors.length) setDetectors(d.items.detectors);
+            } else if (d.items.detectors && typeof d.items.detectors === 'object' && Number(d.items.detectors.qty) > 0) {
+              setDetectors([d.items.detectors]); // legacy: single object pre-array conversion
+            }
             if (d.items.keys?.length) setKeys(d.items.keys);
             if (d.items.customItems?.length) setCustomItems(d.items.customItems);
             if (d.items.paintRows?.length) setPaintRows(d.items.paintRows);
@@ -283,10 +287,13 @@ export default function TurnoverTab({ unit, accentColor }) {
 
       {/* Smoke / CO detectors */}
       <ReplacementBlock title="Smoke / CO detectors">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6 }}>
-          <Field label="Type"><Select value={detectors.type} options={DETECTOR_TYPES} onChange={v => setDetectors(p => ({ ...p, type: v }))} /></Field>
-          <Field label="Qty"><input type="number" min="0" style={qtyStyle} value={detectors.qty} onChange={e => setDetectors(p => ({ ...p, qty: +e.target.value }))} /></Field>
-        </div>
+        {detectors.map((d, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, marginBottom: 6 }}>
+            <Field label="Type"><Select value={d.type} options={DETECTOR_TYPES} onChange={v => updateList(setDetectors, i, 'type', v)} /></Field>
+            <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={d.qty} onChange={e => updateList(setDetectors, i, 'qty', +e.target.value)} /></Field>
+          </div>
+        ))}
+        <button style={addBtnStyle} onClick={() => setDetectors(p => [...p, { type: DETECTOR_TYPES[0], qty: 1 }])}>+ add type</button>
       </ReplacementBlock>
 
       {/* Keys / fobs */}
