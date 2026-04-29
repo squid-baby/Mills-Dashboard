@@ -29,38 +29,6 @@ function formatSyncAgo(date) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
-function formatReplacementItems(items) {
-  if (!items) return '';
-  const parts = [];
-  (items.blinds || []).forEach(b => { if (b.qty > 0) parts.push(`Blind ${b.width}x${b.drop} x${b.qty}`); });
-  (items.bulbs || []).forEach(b => { if (b.qty > 0) parts.push(`Bulb ${b.type} ${b.temp} x${b.qty}`); });
-  (items.stoveParts || []).forEach(s => { if (s.qty > 0) parts.push(`Stove ${s.type}${s.brand ? ' (' + s.brand + ')' : ''} x${s.qty}`); });
-  (items.toiletSeats || []).forEach(t => { if (t.qty > 0) parts.push(`Toilet seat ${t.shape} x${t.qty}`); });
-  (items.outlets || []).forEach(o => { if (o.qty > 0) parts.push(`${o.type} ${o.color} ${o.gang} x${o.qty}`); });
-  if (items.detectors?.qty > 0) parts.push(`${items.detectors.type} x${items.detectors.qty}`);
-  (items.keys || []).forEach(k => { if (k.missing > 0) parts.push(`${k.type} missing x${k.missing}`); });
-  (items.customItems || []).forEach(c => { if (c.name && c.qty > 0) parts.push(`${c.name}${c.spec ? ' ' + c.spec : ''} x${c.qty}`); });
-  return parts.join('; ');
-}
-
-function formatConditionItems(items, level) {
-  if (!items?.conditions) return '';
-  return Object.entries(items.conditions)
-    .filter(([, v]) => v.condition === level)
-    .map(([name, v]) => v.notes ? `${name} (${v.notes})` : name)
-    .join('; ');
-}
-
-function formatPaint(items) {
-  if (!items?.paintRows?.length) return '';
-  return items.paintRows.map(p => {
-    const color = p.color === 'Other' ? (p.customColor || 'Other') : p.color;
-    const cond = p.condition === 'now' ? ' [Update now]' : p.condition === 'next' ? ' [Next turn]' : '';
-    const notes = p.notes ? ` — ${p.notes}` : '';
-    return `${p.location}: ${color} ${p.finish}${cond}${notes}`;
-  }).join('; ');
-}
-
 async function exportTurnoverData(units, inspectionConditions) {
   // Filter to units with a future move-in date
   const now = new Date();
@@ -102,16 +70,25 @@ async function exportTurnoverData(units, inspectionConditions) {
     c === 'at_risk' ? 'At risk' : '';
 
   const escCSV = (v) => {
-    const s = (v || '').toString();
+    const s = (v ?? '').toString();
     return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+
+  const daysSince = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + (dateStr.length === 10 ? 'T00:00:00' : ''));
+    if (isNaN(d)) return '';
+    return Math.floor((Date.now() - d.getTime()) / 864e5);
   };
 
   const headers = [
     'Address', 'Beds', 'Lease End', 'Move Out', 'Move In', 'Turn Window (days)',
     'Current Tenants', 'Next Tenants',
-    'Overall Condition', 'Inspector', 'Inspection Date', 'Overall Notes',
-    'Replacement Items', 'Needs Attention Now', 'Update Next Turn', 'Paint',
-    'Turnover Notes', 'Dashboard Notes',
+    'Last Inspected', 'Days Ago', 'Inspector', 'Status',
+    'Overall Condition',
+    'Gather Pending', 'Gather Done',
+    'Tasks Pending', 'Tasks Done', '% Complete',
+    'Inspection Notes', 'Resident Notes', 'Dashboard Notes',
   ];
   const rows = turnoverUnits.map((u, idx) => {
     let windowDays = '';
@@ -124,6 +101,15 @@ async function exportTurnoverData(units, inspectionConditions) {
     }
     const dashboardNotes = notesPerUnit[idx].map(n => n.body).join('; ');
     const insp = inspectionsPerUnit[idx];
+    const itemRows = Array.isArray(insp?.rows) ? insp.rows.filter(r => r.needs_this) : [];
+    const gather = itemRows.filter(r => r.item_type === 'purchase');
+    const tasks  = itemRows.filter(r => r.item_type === 'work');
+    const gatherDone = gather.filter(r => r.done_at).length;
+    const tasksDone  = tasks.filter(r => r.done_at).length;
+    const total = itemRows.length;
+    const totalDone = gatherDone + tasksDone;
+    const pctComplete = total === 0 ? '' : Math.round((totalDone / total) * 100) + '%';
+
     return [
       u.address,
       u.beds,
@@ -133,14 +119,17 @@ async function exportTurnoverData(units, inspectionConditions) {
       windowDays,
       u.residents.map(r => r.name).join('; '),
       u.nextResidents.map(r => r.name).join('; '),
-      conditionLabel(inspectionConditions[u.address] || ''),
-      insp?.inspector || '',
       insp?.date || '',
+      daysSince(insp?.date),
+      insp?.inspector || '',
+      insp?.status || '',
+      conditionLabel(inspectionConditions[u.address] || ''),
+      gather.length - gatherDone,
+      gatherDone,
+      tasks.length - tasksDone,
+      tasksDone,
+      pctComplete,
       insp?.overallNotes || '',
-      formatReplacementItems(insp?.items),
-      formatConditionItems(insp?.items, 'now'),
-      formatConditionItems(insp?.items, 'next'),
-      formatPaint(insp?.items),
       u.notes,
       dashboardNotes,
     ].map(escCSV).join(',');
