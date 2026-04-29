@@ -10,8 +10,8 @@
 | Tab | Used for | Sync direction |
 |---|---|---|
 | `Tenant Info` | Residents, next residents, lease/move dates | **Read-only by sync** (residents + next_residents replace per matched unit) |
-| `property-info-clean` | All unit attributes (beds, owner, codes, appliances, paint, etc.) | **Read by sync** (upserts units); **read/write by dashboard** via `get-property-info` / `update-property-info` |
-| `Turnover Inspections` | Inspection records | Written by `save-inspection.js`; read by `get-inspection.js`, `get-all-inspections.js`. **Phase B (deferred):** convert writes to append-only. |
+| `property-info-clean` | All unit attributes (beds, owner, codes, appliances, paint, outlet color, etc.) | **Read by sync** (upserts units); **read/write by dashboard** via `get-property-info` / `update-property-info` |
+| `Turnover Inspections` | Inspection records | **Frozen backup as of Phase 1A (April 2026).** Inspections now live in Supabase. The tab is preserved for rollback; nothing reads or writes it. |
 | `Property Info History` | Audit log | Appended on every property field edit by `update-property-info.js` |
 
 Amanda's `.numbers` file is now a **frozen Drive backup**, no longer read by anything. To roll back the migration, `git revert` the cutover commits and restore the deleted scripts from history.
@@ -65,11 +65,16 @@ Header-based lookup with aliases — see `src/config/tenantInfoColumns.js`. The 
 - `next_residents` — one row per future resident (name, email, phone, move_in_date)
 - `unit_full` — view joining units + residents + next_residents (reference only; `get-units.js` queries tables directly to get all fields including phone and move_out_date)
 - `notes` — per-unit notes (id, unit_id, text, created_by, created_at)
-- `inspections` — per-unit inspection records (id, unit_id, inspector, inspection_date, overall_condition, overall_notes, items_json, created_at, updated_at)
+- `inspections` — per-unit inspection records (id, unit_id, **unit_address** (Phase 1A — preferred key now, mirrors `calendar_tasks`), inspector, inspection_date, overall_condition, overall_notes, items_json, **status** ('draft'|'complete', Phase 1A), **turnover_year** (Phase 1A), created_at, updated_at). One row per unit_address (latest wins) — `save-inspection.js` upserts by `unit_address`.
+- `inspection_items` (Phase 1A, April 2026) — one row per inspectable item, normalized for Worklist + Turnover Overview queries. `(id, inspection_id (FK, ON DELETE CASCADE), unit_address, category, item_type, payload jsonb, needs_this, gathered_at, done_at, done_by, created_at, updated_at)`. Categories: `blinds | bulbs | stove_parts | toilet_seats | outlets | detectors | keys | paint | condition | custom`. `item_type`: `purchase` (orderable goods) | `work` (tasks done on-site).
 - `calendar_tasks` — turnover calendar tasks (id uuid, unit_address text, task_type, start_date, start_slot, end_date, end_slot, crew, notes, status, created_at, updated_at)
 - `pending_changes`, `sync_log` — supporting tables
 
 **Phase 2 SQL (already run):** Added 11 new columns to `units` + created `notes` and `inspections` tables. If setting up fresh, run the SQL block from the Phase 2 migration handoff.
+
+**Phase 1A SQL (already run, April 2026):** [`db/migrations/2026-04-29-expand-inspections-for-worklist.sql`](db/migrations/2026-04-29-expand-inspections-for-worklist.sql) — adds `status` / `turnover_year` / `unit_address` to `inspections` + creates `inspection_items` table.
+
+**Phase 1B SQL (already run, April 2026):** [`db/migrations/2026-04-29-expand-units-for-specs.sql`](db/migrations/2026-04-29-expand-units-for-specs.sql) — adds `outlet_standard_color text` to `units`.
 
 ### Tenant Info column mapping (header-name based, source-agnostic)
 Mappings live in `src/config/tenantInfoColumns.js`. Lookup is by **header name** (case-insensitive, smart-quote-tolerant); column position is irrelevant. Each field key carries aliases — current Neo header first, then prior names — so renaming columns in Neo won't break the sync.
@@ -103,9 +108,9 @@ Mappings live in `src/config/tenantInfoColumns.js`. Lookup is by **header name**
 | `get-units` | GET | Queries Supabase `units` with embedded `residents` + `next_residents`, derives status groups |
 | `get-property-info` | GET | Fetches property fields from Google Sheet (all fields in `src/config/columns.js`) |
 | `update-property-info` | POST | Updates a property field in Google Sheet + appends history |
-| `save-inspection` | POST | Saves/updates turnover inspection to Google Sheet |
-| `get-inspection` | GET | Fetches a single inspection by address |
-| `get-all-inspections` | GET | Fetches all inspection summaries (address + overallCondition) |
+| `save-inspection` | POST | Upserts inspection to Supabase `inspections` (one row per unit_address; latest wins) + replaces `inspection_items` rows. Returns `inspection_id`. **Phase 1A: Supabase, no longer Sheet.** |
+| `get-inspection` | GET | Reads `inspections` row by `unit_address` from Supabase, returns the legacy `items` blob shape via `items_json`. **Phase 1A: Supabase.** |
+| `get-all-inspections` | GET | Returns `{ unit_address → overall_condition }` map from Supabase. **Phase 1A: Supabase.** |
 | `get-notes` | GET | Fetches all notes for a unit from Supabase `notes` table (by `unit_id`) |
 | `save-note` | POST | Inserts a note into Supabase `notes` table (`unit_id`, `text`, `created_by`) |
 | `get-calendar-tasks` | GET | Fetches calendar tasks by date range (`?start=&end=`), overlap query |
@@ -130,8 +135,10 @@ Single source of truth for the property-info-clean tab ↔ field key mapping, us
 Column positions may shift as the team rearranges the sheet — always rely on header names, not column letters. Known notable columns (as of April 2026):
 - A: Property (address — must match Supabase `units.address` exactly for syncing)
 - Dashboard-managed fields: Door Code, Lockbox Code, appliance service records, paint info
-- BB: Stove, BC: Stove Replaced, BD: Stove Warranty (added April 2026)
+- BB: Outlet Standard Color (added Phase 1B, April 2026)
 - Legacy column U: "Door Codes" — has some old data, do not remove
+
+**Read range** (Phase 1B fix, April 2026): `get-property-info.js` and `update-property-info.js` previously capped reads at column AZ (52 cols), silently dropping anything past it. Both now use `A:ZZ` (up to col 702). When adding columns past BB, no further range change is needed for a long while. The header lookup is name-based, so column position is irrelevant for matching.
 
 ### Scripts
 | Script | Purpose | Run |
@@ -142,6 +149,9 @@ Column positions may shift as the team rearranges the sheet — always rely on h
 | `seed-units-from-csv.mjs` | One-time: original seed of Supabase units from `Mills_Dashboard_Property_info_sheet.csv`. | Manual only |
 | `migrate-sheet2-to-gsheet.mjs` | One-time: migrated Numbers Sheet 2 → Google Sheet during initial property-info migration. | Manual only / historical |
 | `db/migrations/2026-04-28-expand-units-for-neo.sql` | One-time: adds 32 nullable text columns to `units` (door_code, lockbox_code, appliance service records, paint, portfolio, lead_paint, etc.). Idempotent — `IF NOT EXISTS`. Apply in Supabase SQL editor before first run of `sync-from-neo.mjs`. | One-time, in Supabase SQL editor |
+| `db/migrations/2026-04-29-expand-inspections-for-worklist.sql` | **Phase 1A:** Adds `status` / `turnover_year` / `unit_address` to `inspections`; creates `inspection_items` table. Idempotent. Run before deploying the new Supabase-backed inspection functions. | One-time (already applied) |
+| `db/migrations/2026-04-29-expand-units-for-specs.sql` | **Phase 1B:** Adds `outlet_standard_color` to `units`. Idempotent. | One-time (already applied) |
+| `scripts/migrate-inspections-sheet-to-supabase.mjs` | **Phase 1A one-time backfill:** Reads "Turnover Inspections" Sheet tab, writes one `inspections` row + N `inspection_items` rows per inspection. Skip+report if address already in Supabase. Filters phantom-default seed rows via `isPhantomRow` from `src/lib/inspectionItems.js`. Dry-run by default; `--confirm` to apply. | Manual only (already applied) |
 
 ## Theming
 
@@ -204,6 +214,32 @@ Swimlane-style calendar for scheduling turnover work during May–August season.
 - Drag-to-reschedule (mousedown/touchstart → snap to slot on release)
 - Mobile polish (touch targets, full-screen modals, responsive week grid)
 
+## Phase 1 Redesign (April 2026 — in progress)
+
+Goal: split Property and Turnover tabs into glanceable Overview + structured Edit, migrate inspections off Sheet for per-item action state, and surface a cross-property Worklist for shopping/checklist work.
+
+**Master plan:** `/Users/nathanmills/.claude/plans/we-just-pushed-a-fizzy-umbrella.md` (read for the full Phase 1A–1F arc).
+
+### Phase 1A — Inspections to Supabase (shipped, PR #3)
+- `inspections` table expanded with `status` / `turnover_year` / `unit_address`. New `inspection_items` table — one row per inspectable item with action state (`needs_this`, `gathered_at`, `done_at`).
+- `save-inspection` upserts the inspection row by `unit_address`, then replaces `inspection_items` for that inspection (delete + insert). `get-inspection` returns the legacy `items` blob shape so the existing TurnoverTab UI keeps rendering until Phase 1C re-models it.
+- `src/lib/inspectionItems.js` — shared module for `itemsToRows(items, address, opts)` and the pure `isPhantomRow(row, category)` function. The phantom-default seeds (`blinds[0]`, `bulbs[0]`, `stoveParts[0]`, `toiletSeats[0]`, `outlets[0]`) are documented constants in this file.
+- Backfill (`scripts/migrate-inspections-sheet-to-supabase.mjs`) ran once; filtered phantom rows from the migrated data.
+- Sheet tab `Turnover Inspections` is preserved as a frozen backup.
+
+### Phase 1B — Property tab Overview/Edit + outlet color (shipped, PR #4)
+- `PROPERTY_INFO_FIELDS` moved from `src/data/units.js` to `src/config/propertyOptions.js`. The new file is the single place to add/remove Property-tab fields. Header comment lists what each new field needs (HEADER_TO_FIELD entry, Sheet column header, optional Supabase column).
+- New `Standards` category: `outlet_standard_color` (one-of-five dropdown). Sheet column "Outlet Standard Color" at BB. Supabase column `units.outlet_standard_color`.
+- `PropertyInfoTab.jsx` now renders an Overview by default (only categories with populated fields, label/value pairs) and toggles to the existing accordion form via a pencil button. Quick-Note input is gated behind Edit; the notes display shows in both views.
+- All Turnover replacement-item arrays start empty (`useState([])`): blinds, bulbs, stoveParts, toiletSeats, outlets, keys, **detectors** (converted from single object to array+add pattern). Inspector clicks `+ add` to insert a row pre-filled with seed values. Backwards-compat fallback in `TurnoverTab.jsx` and `inspectionItems.js` for legacy single-object detectors.
+- Bug fix bundled: `get-property-info.js` and `update-property-info.js` widened sheet read range from `A:AZ` (52 cols) to `A:ZZ` (702 cols). The new BB column wouldn't have been visible otherwise.
+
+### Phase 1C–1F — TODO
+- **1C**: Turnover tab Overview (Gather / Tasks lists driven by `inspection_items WHERE needs_this = true`) + Edit (existing form refactored for `needs_this` toggles + `purchaseNeeded` on custom items + pre-fill blind sizes from previous inspection's `inspection_items`). Extract option arrays to `src/config/turnoverOptions.js`.
+- **1D**: New Worklist view (`/api/get-worklist-items` + `WorklistView.jsx`), top-level header button. Aggregates Gather/Tasks across all turnover units; CSV + Shopping List + Print exports.
+- **1E**: Rebuild Export Turnovers around the new structured data.
+- **1F**: Tile polish — "Last inspected: 12d ago" badge, draft-vs-complete inspection flag style.
+
 ## Key Decisions (April 2026)
 
 ### Sync Button + Change Email
@@ -223,7 +259,7 @@ Swimlane-style calendar for scheduling turnover work during May–August season.
 - Stove, Stove Replaced, Stove Warranty added to match the pattern of washer/dryer/dishwasher/fridge.
 - Stove is a free-text field (e.g. "GE Gas 30"") — not a boolean like the presence fields.
 - All three live in the Google Sheet only (not synced to Supabase).
-- To add future appliance fields: add to `HEADER_TO_FIELD` + `FIELD_TO_HEADER` in `columns.js`, add to `units.js` appliances section, append column header to the Sheet.
+- To add future appliance fields: add to `HEADER_TO_FIELD` + `FIELD_TO_HEADER` in `columns.js`, add to the appliances section in `src/config/propertyOptions.js` (Phase 1B), append column header to the Sheet.
 
 ### Unit Row Authority
 - The Property Info Google Sheet is the **sole authority** for what units exist in Supabase.
@@ -287,7 +323,11 @@ Swimlane-style calendar for scheduling turnover work during May–August season.
 
 **Need to roll back the Neo migration** — `git revert` the merge commit. The `.numbers` file is still in Drive at `/Volumes/One Touch/The_Team_Google_Drive Sync/2025-2026 Renewals_Dashboard.numbers` as a frozen backup. Restoring `sync-from-numbers.mjs` + `sync-property-cache.mjs` + `download-numbers-file.mjs` from history pre-cutover gets you back to the prior architecture.
 
-**Adding a new property info field** — Two-step process: (1) add a SQL migration in `db/migrations/` that adds the column to `units`, run it in Supabase. (2) Add `HEADER_TO_FIELD` + `FIELD_TO_HEADER` entries in `src/config/columns.js`. Next sync run picks it up automatically.
+**Adding a new property info field** — Three-step process: (1) add a SQL migration in `db/migrations/` that adds the column to `units`, run it in Supabase. (2) Add `HEADER_TO_FIELD` + `FIELD_TO_HEADER` entries in `src/config/columns.js`. (3) Add a field entry to the appropriate category in `src/config/propertyOptions.js` (move-from-units.js as of Phase 1B). Append the column header to the Sheet (anywhere — position doesn't matter; lookup is by name). Next sync run picks it up automatically.
+
+**`netlify dev` from a git worktree shows stale code** — When `netlify dev` is run from `.claude/worktrees/<name>/`, esbuild bundles source files from the **main worktree's** path instead of the current worktree's path, so it serves whatever's on the branch the main worktree has checked out. Workaround: switch the main worktree to your branch (`git switch --ignore-other-worktrees <branch>` from the main worktree dir), refresh files (`git checkout HEAD -- .`), then run `npx netlify dev` from the main worktree. After verification, `git switch main` to restore. The `.claude/launch.json` preview-server config also runs from the main worktree path.
+
+**`get-property-info` returns 0 fields for every address** — Two known causes: (1) `SHEET_ID_PROPERTY_INFO` env var points at the wrong sheet (a stale sheet that's missing the `property-info-clean` tab will fail with a "Unable to parse range" error from Sheets API; the function catches this and returns `{ data: {} }`). The current Neo sheet ID starts with `1cMJ...`. (2) Pre-Phase-1B, the function read range `A:AZ` (52 cols), so any column past column 52 was invisible — now fixed to `A:ZZ`.
 
 ## Dev Setup
 ```bash
