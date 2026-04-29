@@ -17,12 +17,12 @@ export default function DetailPanel({ unit, onClose, theme = 'dark' }) {
     setNoteText('');
     setActiveTab('tenant');
     setNotesLoading(true);
-    fetch(`/api/get-notes?unit_id=${unit.id}`)
+    fetch(`/api/get-notes?address=${encodeURIComponent(unit.address)}`)
       .then(r => r.json())
       .then(data => setLocalNotes(data.notes || []))
       .catch(() => setLocalNotes([]))
       .finally(() => setNotesLoading(false));
-  }, [unit.id]);
+  }, [unit.address]);
 
   function handleAdd() {
     if (!noteText.trim() || saving) return;
@@ -30,7 +30,7 @@ export default function DetailPanel({ unit, onClose, theme = 'dark' }) {
     fetch('/api/save-note', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ unit_id: unit.id, text: noteText.trim(), created_by: 'Team' }),
+      body: JSON.stringify({ address: unit.address, body: noteText.trim(), created_by: 'Team' }),
     })
       .then(r => r.json())
       .then(data => {
@@ -371,7 +371,7 @@ export default function DetailPanel({ unit, onClose, theme = 'dark' }) {
                       borderLeft: `3px solid ${c.color}`,
                       animation: i === 0 && localNotes.length > 1 ? 'slideUp 200ms var(--ease)' : 'none',
                     }}>
-                      <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.4 }}>{n.text}</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.4 }}>{n.body}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
                         {n.created_by} / {new Date(n.created_at).toLocaleString()}
                       </div>

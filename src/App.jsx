@@ -79,7 +79,7 @@ async function exportTurnoverData(units, inspectionConditions) {
   const [notesPerUnit, inspectionsPerUnit] = await Promise.all([
     Promise.all(
       turnoverUnits.map(u =>
-        fetch(`/api/get-notes?unit_id=${u.id}`)
+        fetch(`/api/get-notes?address=${encodeURIComponent(u.address)}`)
           .then(r => r.json())
           .then(data => data.notes || [])
           .catch(() => [])
@@ -121,7 +121,7 @@ async function exportTurnoverData(units, inspectionConditions) {
       const inn = new Date(2000 + (pIn[2] < 100 ? pIn[2] : pIn[2] - 2000), pIn[0] - 1, pIn[1]);
       windowDays = Math.ceil((inn - out) / 864e5);
     }
-    const dashboardNotes = notesPerUnit[idx].map(n => n.text).join('; ');
+    const dashboardNotes = notesPerUnit[idx].map(n => n.body).join('; ');
     const insp = inspectionsPerUnit[idx];
     return [
       u.address,

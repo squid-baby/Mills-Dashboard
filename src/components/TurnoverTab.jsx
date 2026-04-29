@@ -179,12 +179,12 @@ export default function TurnoverTab({ unit, accentColor }) {
 
   // Load notes (latest 2-3 surface above the form in Edit)
   useEffect(() => {
-    if (!unit.id && unit.id !== 0) return;
-    fetch(`/api/get-notes?unit_id=${unit.id}`)
+    if (!unit.address) return;
+    fetch(`/api/get-notes?address=${encodeURIComponent(unit.address)}`)
       .then(r => r.json())
       .then(data => setNotes(Array.isArray(data.notes) ? data.notes.slice(0, 3) : []))
       .catch(() => setNotes([]));
-  }, [unit.id]);
+  }, [unit.address]);
 
   async function handleSave() {
     setSaving(true);
@@ -564,7 +564,7 @@ function TurnoverEdit(props) {
               borderRadius: 'var(--radius-sm)', marginBottom: 4,
               borderLeft: `3px solid ${accentColor}`,
             }}>
-              <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.4 }}>{n.text}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.4 }}>{n.body}</div>
               {n.created_at && (
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3 }}>
                   {new Date(n.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
