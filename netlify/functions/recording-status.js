@@ -1,60 +1,57 @@
-// Recording status endpoint — backs the public /recording.html page.
+// Recording status endpoint — backs the inline REC pill in the dashboard.
 //
 // GET   → public, returns { recording, since, updatedAt }
 // POST  → gated by RECORDING_SECRET env var; body { recording: bool }
 //          Used by scripts/meeting-capture/record-meeting.sh on the Mac.
 //
-// State lives in a Netlify Blob so it persists across function invocations
-// without needing a SQL migration.
+// Uses the Netlify Functions v2 signature so Blobs context is auto-injected.
+// (The v1 `handler(event)` form throws MissingBlobsEnvironmentError because
+// Blobs context isn't bound to legacy handlers.)
 
 import { getStore } from '@netlify/blobs';
 
 const STORE_NAME = 'recording-status';
 const KEY = 'state';
-
 const DEFAULT_STATE = { recording: false, since: null, updatedAt: null };
 
-function jsonResponse(statusCode, body, extraHeaders = {}) {
-  return {
-    statusCode,
+function jsonResponse(body, statusCode = 200) {
+  return new Response(JSON.stringify(body), {
+    status: statusCode,
     headers: {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-store',
       'Access-Control-Allow-Origin': '*',
-      ...extraHeaders,
     },
-    body: JSON.stringify(body),
-  };
+  });
 }
 
-export async function handler(event) {
+export default async (req) => {
   const store = getStore(STORE_NAME);
 
-  if (event.httpMethod === 'GET') {
+  if (req.method === 'GET') {
     const state = (await store.get(KEY, { type: 'json' })) || DEFAULT_STATE;
-    return jsonResponse(200, state);
+    return jsonResponse(state);
   }
 
-  if (event.httpMethod === 'POST') {
+  if (req.method === 'POST') {
     const expected = process.env.RECORDING_SECRET;
     if (!expected) {
-      return jsonResponse(500, { ok: false, message: 'RECORDING_SECRET not configured on the server' });
+      return jsonResponse(
+        { ok: false, message: 'RECORDING_SECRET not configured on the server' },
+        500,
+      );
     }
 
-    const provided =
-      event.headers['x-recording-secret'] ||
-      event.headers['X-Recording-Secret'] ||
-      event.headers['X-RECORDING-SECRET'];
-
+    const provided = req.headers.get('x-recording-secret');
     if (provided !== expected) {
-      return jsonResponse(401, { ok: false, message: 'unauthorized' });
+      return jsonResponse({ ok: false, message: 'unauthorized' }, 401);
     }
 
     let body = {};
     try {
-      body = JSON.parse(event.body || '{}');
+      body = await req.json();
     } catch {
-      return jsonResponse(400, { ok: false, message: 'invalid JSON body' });
+      return jsonResponse({ ok: false, message: 'invalid JSON body' }, 400);
     }
 
     const recording = !!body.recording;
@@ -66,8 +63,8 @@ export async function handler(event) {
     };
 
     await store.setJSON(KEY, state);
-    return jsonResponse(200, { ok: true, ...state });
+    return jsonResponse({ ok: true, ...state });
   }
 
-  return jsonResponse(405, { ok: false, message: 'method not allowed' });
-}
+  return jsonResponse({ ok: false, message: 'method not allowed' }, 405);
+};
