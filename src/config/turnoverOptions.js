@@ -59,7 +59,7 @@ export const CONDITION_GROUPS = [
   { section: 'Doors',                    items: ['Interior doors', 'Exterior doors', 'Closet doors & tracks', 'Door weatherstripping', 'Sliding door & track'] },
   { section: 'Door & cabinet hardware',  items: ['Interior door knobs / levers', 'Deadbolts & exterior locks', 'Cabinet doors & hinges', 'Cabinet knobs & pulls', 'Drawer slides'] },
   { section: 'Kitchen',                  items: ['Cabinets (boxes & finish)', 'Countertops', 'Sink & faucet', 'Stove / range', 'Range hood & filter', 'Microwave', 'Refrigerator', 'Dishwasher'] },
-  { section: 'Bathroom(s)',              items: ['Vanity & cabinet', 'Sink & faucet', 'Toilet', 'Tub / shower surround', 'Shower door / rod', 'Exhaust fan', 'Caulk & grout'] },
+  { section: 'Bathroom(s)',              items: ['Vanity & cabinet', 'Vanity light fixture', 'Sink & faucet', 'Toilet', 'Tub / shower surround', 'Shower door / rod', 'Exhaust fan', 'Caulk & grout'] },
   { section: 'Lighting & electrical',    items: ['Ceiling fixtures', 'Ceiling fan(s)', 'Recessed lights', 'Under-cabinet lights', 'GFCI outlets (kitchen / bath)'] },
   { section: 'HVAC & utilities',         items: ['Thermostat', 'HVAC unit / air handler', 'Supply & return vents', 'Water heater', 'Washer hookup', 'Dryer hookup / vent'] },
   { section: 'Windows',                  items: ['Window sashes & glass', 'Window screens', 'Window locks & hardware'] },
