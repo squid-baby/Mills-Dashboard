@@ -18,6 +18,9 @@
  *
  * Required env vars:
  *   SUPABASE_URL, SUPABASE_SERVICE_KEY
+ *
+ * Optional env vars (summary email — skipped silently if any are missing):
+ *   GMAIL_USER, GMAIL_APP_PASSWORD, MEETING_EMAIL_TO
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -111,6 +114,8 @@ export async function handler(event) {
 
     console.log(`[save-inspection] OK — "${address}" | ${itemRows.length} items | ${Date.now() - t0}ms`);
 
+    await sendSummaryEmail({ address, inspection: inspectionRow, itemRows });
+
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -123,5 +128,58 @@ export async function handler(event) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ error: err.message }),
     };
+  }
+}
+
+const CONDITION_LABELS = {
+  up_to_date: 'Up to date',
+  needs_love: 'Needs love',
+  at_risk: 'At risk',
+};
+
+async function sendSummaryEmail({ address, inspection, itemRows }) {
+  const { GMAIL_USER, GMAIL_APP_PASSWORD, MEETING_EMAIL_TO } = process.env;
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD || !MEETING_EMAIL_TO) return;
+
+  try {
+    const flagged = itemRows.filter(r => r.needs_this);
+    const gather = flagged.filter(r => r.item_type === 'purchase');
+    const tasks = flagged.filter(r => r.item_type === 'work');
+    const conditionLabel = CONDITION_LABELS[inspection.overall_condition] || inspection.overall_condition || '—';
+    const isDraft = inspection.status === 'draft';
+
+    const lines = [
+      `Address: ${address}`,
+      `Inspector: ${inspection.inspector || '—'}`,
+      `Date: ${inspection.inspection_date}`,
+      `Status: ${inspection.status}`,
+      `Overall condition: ${conditionLabel}`,
+      '',
+      `Flagged items: ${flagged.length} (Gather: ${gather.length} · Tasks: ${tasks.length})`,
+    ];
+    if (inspection.overall_notes) {
+      lines.push('', 'Overall notes:', inspection.overall_notes);
+    }
+    if (flagged.length > 0) {
+      lines.push('', '— Flagged —');
+      for (const r of flagged) {
+        const p = r.payload || {};
+        const desc = p.item || p.name || p.type || p.location || r.category;
+        const note = p.condition || p.spec || p.notes || '';
+        lines.push(`  • [${r.item_type === 'purchase' ? 'Gather' : 'Task'}] ${r.category} — ${desc}${note ? ` (${note})` : ''}`);
+      }
+    }
+
+    const { createTransport } = await import('nodemailer');
+    const transporter = createTransport({ service: 'gmail', auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD } });
+    await transporter.sendMail({
+      from: GMAIL_USER,
+      to: MEETING_EMAIL_TO,
+      subject: `Inspection ${isDraft ? 'draft ' : ''}saved: ${address} — ${conditionLabel}`,
+      text: lines.join('\n'),
+    });
+    console.log(`[save-inspection] ✉ Summary email sent for "${address}"`);
+  } catch (err) {
+    console.error(`[save-inspection] email failed for "${address}":`, err.message);
   }
 }
