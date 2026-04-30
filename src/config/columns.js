@@ -77,6 +77,9 @@ export const HEADER_TO_FIELD = {
   'Toilet Flapper Style':       'toilet_flapper_style',
   'Toilet Seat Style':          'toilet_seat_style',
 
+  // Standards
+  'Outlet Standard Color':      'outlet_standard_color',
+
   // Paint
   'Paint Interior':             'paint_interior',
   'Paint Trim':                 'paint_trim',
@@ -156,6 +159,9 @@ export const FIELD_TO_HEADER = {
   // Plumbing
   'toilet_flapper_style':       'Toilet Flapper Style',
   'toilet_seat_style':          'Toilet Seat Style',
+
+  // Standards
+  'outlet_standard_color':      'Outlet Standard Color',
 
   // Paint
   'paint_interior':             'Paint Interior',

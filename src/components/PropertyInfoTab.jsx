@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { PROPERTY_INFO_FIELDS } from '../data/units';
+import { PROPERTY_INFO_FIELDS } from '../config/propertyOptions';
 
 function fieldLabel(key) {
   return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -26,6 +26,7 @@ function resolveValue(fieldDef, sheetData, gsheetData) {
 }
 
 export default function PropertyInfoTab({ unit, accentColor }) {
+  const [view, setView] = useState('overview');
   const [gsheetData, setGsheetData] = useState({});
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -153,6 +154,9 @@ export default function PropertyInfoTab({ unit, accentColor }) {
     );
   }
 
+  const isEdit = view === 'edit';
+  const notes = gsheetData['unit_notes'] || '';
+
   return (
     <div>
       {/* Toast */}
@@ -170,47 +174,87 @@ export default function PropertyInfoTab({ unit, accentColor }) {
         </div>
       )}
 
-      {/* Quick Note */}
-      <div style={{ marginBottom: 24 }}>
+      {/* Header with view toggle */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 16,
+      }}>
         <h3 style={{
-          margin: '0 0 10px', fontSize: 11, fontWeight: 700,
+          margin: 0, fontSize: 11, fontWeight: 700,
           color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em',
         }}>
-          Quick Note
+          Property Info {isEdit && <span style={{ color: accentColor, marginLeft: 6 }}>· Editing</span>}
         </h3>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-          <input
-            type="text" value={quickNote}
-            onChange={e => setQuickNote(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') saveQuickNote(); }}
-            placeholder="Add a note..."
-            style={{
-              flex: 1, background: 'var(--bg-input)',
-              border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-sm)',
-              padding: '9px 12px', color: 'var(--text-primary)',
-              fontSize: 13, outline: 'none',
-              transition: 'border-color var(--duration-fast) ease',
-            }}
-            onFocus={e => e.target.style.borderColor = 'rgba(99, 102, 241, 0.5)'}
-            onBlur={e => e.target.style.borderColor = 'var(--border-default)'}
-          />
-          <button
-            onClick={saveQuickNote}
-            disabled={savingNote}
-            style={{
-              background: accentColor, border: 'none',
-              borderRadius: 'var(--radius-sm)',
-              padding: '0 16px', color: '#000', fontWeight: 700, fontSize: 16,
-              cursor: 'pointer', opacity: savingNote ? 0.5 : 1,
-              transition: 'opacity var(--duration-fast) ease',
-            }}
-          >
-            {savingNote ? '...' : '+'}
-          </button>
-        </div>
-        {gsheetData['unit_notes'] ? (
-          gsheetData['unit_notes'].split('\n').map((line, i) => (
+        <button
+          onClick={() => setView(isEdit ? 'overview' : 'edit')}
+          title={isEdit ? 'Done editing' : 'Edit'}
+          style={{
+            background: isEdit ? accentColor : 'transparent',
+            border: `1px solid ${isEdit ? accentColor : 'var(--border-default)'}`,
+            borderRadius: 'var(--radius-sm)',
+            padding: '5px 10px', cursor: 'pointer',
+            color: isEdit ? '#000' : 'var(--text-muted)',
+            fontSize: 11, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 5,
+            transition: 'all var(--duration-fast) ease',
+          }}
+        >
+          {isEdit ? (
+            <>
+              <svg style={{ width: 11, height: 11 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Done
+            </>
+          ) : (
+            <>
+              <svg style={{ width: 11, height: 11 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                <path d="m15 5 4 4" />
+              </svg>
+              Edit
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Quick Note — input only in edit; notes display in both views */}
+      <div style={{ marginBottom: 24 }}>
+        {isEdit && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input
+              type="text" value={quickNote}
+              onChange={e => setQuickNote(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') saveQuickNote(); }}
+              placeholder="Add a note..."
+              style={{
+                flex: 1, background: 'var(--bg-input)',
+                border: '1px solid var(--border-default)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '9px 12px', color: 'var(--text-primary)',
+                fontSize: 13, outline: 'none',
+                transition: 'border-color var(--duration-fast) ease',
+              }}
+              onFocus={e => e.target.style.borderColor = 'rgba(99, 102, 241, 0.5)'}
+              onBlur={e => e.target.style.borderColor = 'var(--border-default)'}
+            />
+            <button
+              onClick={saveQuickNote}
+              disabled={savingNote}
+              style={{
+                background: accentColor, border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                padding: '0 16px', color: '#000', fontWeight: 700, fontSize: 16,
+                cursor: 'pointer', opacity: savingNote ? 0.5 : 1,
+                transition: 'opacity var(--duration-fast) ease',
+              }}
+            >
+              {savingNote ? '...' : '+'}
+            </button>
+          </div>
+        )}
+        {notes ? (
+          notes.split('\n').map((line, i) => (
             <div key={i} style={{
               padding: '8px 12px', background: 'var(--bg-elevated)',
               borderRadius: 'var(--radius-sm)', marginBottom: 4,
@@ -220,11 +264,110 @@ export default function PropertyInfoTab({ unit, accentColor }) {
             </div>
           ))
         ) : (
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', fontStyle: 'italic' }}>No notes yet.</div>
+          isEdit && <div style={{ fontSize: 13, color: 'var(--text-dim)', fontStyle: 'italic' }}>No notes yet.</div>
         )}
       </div>
 
-      {/* Categories */}
+      {isEdit
+        ? <EditCategories
+            sheetData={sheetData}
+            gsheetData={gsheetData}
+            expanded={expanded}
+            toggleCategory={toggleCategory}
+            editing={editing}
+            editValue={editValue}
+            setEditValue={setEditValue}
+            saving={saving}
+            startEdit={startEdit}
+            saveEdit={saveEdit}
+            cancelEdit={cancelEdit}
+            historyField={historyField}
+            setHistoryField={setHistoryField}
+            fieldHasHistory={fieldHasHistory}
+            getFieldHistory={getFieldHistory}
+            accentColor={accentColor}
+          />
+        : <Overview sheetData={sheetData} gsheetData={gsheetData} />
+      }
+    </div>
+  );
+}
+
+// ─── Overview (read-only) ───────────────────────────────────────────────────
+
+function Overview({ sheetData, gsheetData }) {
+  const populated = PROPERTY_INFO_FIELDS
+    .map(category => {
+      const fields = category.fields.map(getFieldDef);
+      const visible = fields
+        .map(f => ({ field: f, value: resolveValue(f, sheetData, gsheetData) }))
+        .filter(({ value }) => value !== '' && value != null);
+      return { category, visible };
+    })
+    .filter(({ visible }) => visible.length > 0);
+
+  if (populated.length === 0) {
+    return (
+      <div style={{
+        padding: 24, textAlign: 'center',
+        color: 'var(--text-dim)', fontSize: 13, fontStyle: 'italic',
+      }}>
+        No property info recorded yet. Tap Edit to add details.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {populated.map(({ category, visible }) => (
+        <div key={category.id} style={{ marginBottom: 18 }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700,
+            color: 'var(--text-muted)',
+            textTransform: 'uppercase', letterSpacing: '0.08em',
+            marginBottom: 8, paddingBottom: 5,
+            borderBottom: '1px solid var(--border-subtle)',
+          }}>
+            {category.label}
+          </div>
+          {visible.map(({ field, value }) => (
+            <div key={field.key} style={{
+              display: 'flex', justifyContent: 'space-between',
+              alignItems: 'baseline', gap: 12,
+              padding: '5px 2px',
+            }}>
+              <span style={{
+                fontSize: 12, color: 'var(--text-muted)',
+              }}>
+                {field.label}
+              </span>
+              <span style={{
+                fontSize: 13, fontWeight: 500, color: 'var(--text-primary)',
+                textAlign: 'right',
+                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              }}>
+                {value}
+              </span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Edit (existing accordion-with-inline-edit form) ────────────────────────
+
+function EditCategories({
+  sheetData, gsheetData, expanded, toggleCategory,
+  editing, editValue, setEditValue, saving,
+  startEdit, saveEdit, cancelEdit,
+  historyField, setHistoryField,
+  fieldHasHistory, getFieldHistory,
+  accentColor,
+}) {
+  return (
+    <>
       {PROPERTY_INFO_FIELDS.map(category => {
         const isOpen = expanded[category.id];
         const fields = category.fields.map(f => getFieldDef(f));
@@ -454,6 +597,6 @@ export default function PropertyInfoTab({ unit, accentColor }) {
           </div>
         );
       })}
-    </div>
+    </>
   );
 }

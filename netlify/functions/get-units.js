@@ -40,6 +40,7 @@ export async function handler() {
         hvac_last_service, water_heater_location, water_heater_type, water_heater_last_service,
         water_shutoff, filter_size, filter_size_2, internet_provider,
         toilet_flapper_style, toilet_seat_style,
+        outlet_standard_color,
         paint_interior, paint_trim, paint_brand, paint_last_done,
         unit_notes, portfolio, lead_paint,
         residents ( name, email, phone, status, lease_end, move_out_date, lease_signed, deposit_paid, notes ),
@@ -166,6 +167,8 @@ function buildUnit(row, id) {
       // Plumbing
       toilet_flapper_style: row.toilet_flapper_style || '',
       toilet_seat_style:    row.toilet_seat_style || '',
+      // Standards
+      outlet_standard_color: row.outlet_standard_color || '',
       // Paint
       paint_interior:   row.paint_interior || '',
       paint_trim:       row.paint_trim || '',

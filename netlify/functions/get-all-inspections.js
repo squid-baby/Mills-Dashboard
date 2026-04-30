@@ -1,12 +1,16 @@
 /**
  * Netlify Function: GET /api/get-all-inspections
  *
- * Returns a map { unit_address → overallCondition } for the dashboard tile
- * grid. One entry per unit (latest inspection wins).
+ * Returns a map { unit_address → { condition, date, status } } for the
+ * dashboard tile grid. One entry per unit (latest inspection wins by
+ * created_at).
  *
  * Local curl example:
  *   curl http://localhost:8888/api/get-all-inspections
- *   → 200 { "inspections": { "123 Main St": "up_to_date", "...": "needs_love" } }
+ *   → 200 { "inspections": {
+ *       "123 Main St": { "condition": "up_to_date", "date": "2026-04-29", "status": "complete" },
+ *       ...
+ *     } }
  *
  * Required env vars:
  *   SUPABASE_URL, SUPABASE_SERVICE_KEY
@@ -30,16 +34,20 @@ export async function handler() {
 
     const { data, error } = await supabase
       .from('inspections')
-      .select('unit_address, overall_condition, created_at')
+      .select('unit_address, overall_condition, inspection_date, status, created_at')
       .order('created_at', { ascending: true });
     if (error) throw new Error(error.message);
 
-    // Latest condition per address — iterate ascending so later rows overwrite earlier.
+    // Latest inspection per address — iterate ascending so later rows overwrite earlier.
     const inspections = {};
     for (const row of data || []) {
       const addr = (row.unit_address || '').trim();
-      const cond = (row.overall_condition || '').trim();
-      if (addr && cond) inspections[addr] = cond;
+      if (!addr) continue;
+      inspections[addr] = {
+        condition: (row.overall_condition || '').trim(),
+        date: row.inspection_date || '',
+        status: row.status || 'complete',
+      };
     }
 
     console.log(`[get-all-inspections] OK — ${Object.keys(inspections).length} inspections | ${Date.now() - t0}ms`);
