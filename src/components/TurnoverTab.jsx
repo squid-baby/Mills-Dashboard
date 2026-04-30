@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  BLIND_HEIGHTS,
+  BLIND_WIDTHS, BLIND_HEIGHTS,
   BULB_TYPES, BULB_TEMPS,
   STOVE_TYPES, BOWL_SHAPES,
   OUTLET_TYPES, OUTLET_COLORS, OUTLET_GANGS,
@@ -116,7 +116,7 @@ export default function TurnoverTab({ unit, accentColor, onOpenWorklist }) {
   const [paintRows, setPaintRows] = useState([]);
 
   // Snapshot of the most recent saved blinds — used to pre-fill `+ add window`.
-  const [blindDefault, setBlindDefault] = useState({ height: BLIND_HEIGHTS[1] });
+  const [blindDefault, setBlindDefault] = useState({ width: BLIND_WIDTHS[0], height: BLIND_HEIGHTS[1] });
 
   const [conditions, setConditions] = useState(() => {
     const init = {};
@@ -147,7 +147,7 @@ export default function TurnoverTab({ unit, accentColor, onOpenWorklist }) {
             if (d.items.blinds?.length) {
               setBlinds(d.items.blinds);
               const first = d.items.blinds[0] || {};
-              setBlindDefault({ height: first.height || first.drop || BLIND_HEIGHTS[1] });
+              setBlindDefault({ width: first.width || BLIND_WIDTHS[0], height: first.height || first.drop || BLIND_HEIGHTS[1] });
             }
             if (d.items.bulbs?.length) setBulbs(d.items.bulbs);
             if (d.items.stoveParts?.length) setStoveParts(d.items.stoveParts);
@@ -569,12 +569,13 @@ function TurnoverEdit(props) {
       <ReplacementBlock title="Blinds">
         {blinds.map((b, i) => (
           <RowGrid key={i}>
+            <Field label="Width"><Select value={b.width} options={BLIND_WIDTHS} onChange={v => updateList(setBlinds, i, 'width', v)} /></Field>
             <Field label="Height"><Select value={b.height || b.drop} options={BLIND_HEIGHTS} onChange={v => updateList(setBlinds, i, 'height', v)} /></Field>
             <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={b.qty} onChange={e => updateList(setBlinds, i, 'qty', +e.target.value)} /></Field>
             <NeedToggle value={!!b.needs_this} onChange={v => setNeed(setBlinds, i, v)} />
           </RowGrid>
         ))}
-        <button style={addBtnStyle} onClick={() => setBlinds(p => [...p, { height: blindDefault.height, qty: 1, needs_this: false }])}>+ add window</button>
+        <button style={addBtnStyle} onClick={() => setBlinds(p => [...p, { width: blindDefault.width, height: blindDefault.height, qty: 1, needs_this: false }])}>+ add window</button>
       </ReplacementBlock>
 
       {/* Light bulbs */}
