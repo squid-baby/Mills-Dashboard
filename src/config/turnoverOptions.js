@@ -118,11 +118,32 @@ export function summarizeRow(row) {
   }
 }
 
+// True when a work row also needs something gathered on-site.
+// Single source of truth — Overview, Worklist, and shoppingKey all branch on this.
+export function hasGatherSpec(row) {
+  return row.item_type === 'work' && !!(row.payload?.gather_spec || '').trim();
+}
+
+// Gather-side label for a row. Purchase rows reuse summarizeRow; work rows with
+// gather_spec render the spec verbatim, prefixed with the underlying task so
+// the gatherer can see what it's for.
+export function summarizeGatherRow(row) {
+  if (hasGatherSpec(row)) {
+    const p = row.payload || {};
+    const context = row.category === 'condition' ? p.item
+                  : row.category === 'paint'     ? p.location
+                  : '';
+    return context ? `${p.gather_spec} — for ${context}` : p.gather_spec;
+  }
+  return summarizeRow(row);
+}
+
 // Stable shopping-list key — rolls multiple matching rows into one row with summed qty.
 // e.g. 3× "Blinds 23\" × 36\"" + 2× "Blinds 23\" × 36\"" → 5× "Blinds 23\" × 36\""
 // Returns the same string regardless of qty / address / done state.
 export function shoppingKey(row) {
   const p = row.payload || {};
+  if (hasGatherSpec(row)) return `gather_spec|${(p.gather_spec || '').trim().toLowerCase()}`;
   switch (row.category) {
     case 'blinds':       return `blinds|${p.width || ''}|${p.drop || ''}`;
     case 'bulbs':        return `bulbs|${p.type || ''}|${p.temp || ''}`;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  CATEGORY_LABELS, summarizeRow, sectionForConditionItem, shoppingKey,
+  CATEGORY_LABELS, summarizeRow, summarizeGatherRow, sectionForConditionItem, shoppingKey, hasGatherSpec,
 } from '../config/turnoverOptions';
 
 const sectionTitleStyle = {
@@ -60,7 +60,9 @@ export default function WorklistView({ initialAddress, onBack, themeButton }) {
   );
 
   const filtered = filterAddress ? rows.filter(r => r.unit_address === filterAddress) : rows;
-  const gather = filtered.filter(r => r.item_type === 'purchase');
+  // Work rows with a gather_spec appear in BOTH lists. The Gather card uses
+  // gathered_at; the Tasks card uses done_at — independent columns.
+  const gather = filtered.filter(r => r.item_type === 'purchase' || hasGatherSpec(r));
   const tasks  = filtered.filter(r => r.item_type === 'work');
 
   async function toggleRowField(rowId, field, value) {
@@ -85,15 +87,37 @@ export default function WorklistView({ initialAddress, onBack, themeButton }) {
 
   function exportCsv() {
     const header = ['Address', 'Type', 'Category', 'Item', 'Gathered', 'Done', 'Done by'];
-    const lines = filtered.map(r => [
-      r.unit_address || '',
-      r.item_type === 'purchase' ? 'Gather' : 'Task',
-      CATEGORY_LABELS[r.category] || r.category,
-      summarizeRow(r),
-      r.gathered_at ? new Date(r.gathered_at).toISOString().slice(0, 10) : '',
-      r.done_at ? new Date(r.done_at).toISOString().slice(0, 10) : '',
-      r.done_by || '',
-    ]);
+    // Work rows with a gather_spec emit two CSV lines: one Gather row with the
+    // gather label, one Task row with the task summary. Mirrors how they're
+    // rendered.
+    const lines = [];
+    for (const r of filtered) {
+      if (r.item_type === 'purchase') {
+        lines.push([
+          r.unit_address || '', 'Gather', CATEGORY_LABELS[r.category] || r.category,
+          summarizeRow(r),
+          r.gathered_at ? new Date(r.gathered_at).toISOString().slice(0, 10) : '',
+          r.done_at ? new Date(r.done_at).toISOString().slice(0, 10) : '',
+          r.done_by || '',
+        ]);
+      } else {
+        if (hasGatherSpec(r)) {
+          lines.push([
+            r.unit_address || '', 'Gather', CATEGORY_LABELS[r.category] || r.category,
+            summarizeGatherRow(r),
+            r.gathered_at ? new Date(r.gathered_at).toISOString().slice(0, 10) : '',
+            '', '',
+          ]);
+        }
+        lines.push([
+          r.unit_address || '', 'Task', CATEGORY_LABELS[r.category] || r.category,
+          summarizeRow(r),
+          '',
+          r.done_at ? new Date(r.done_at).toISOString().slice(0, 10) : '',
+          r.done_by || '',
+        ]);
+      }
+    }
     const csv = [header, ...lines].map(row => row.map(csvCell).join(',')).join('\n');
     downloadFile(csv, suffixedName('worklist'), 'text/csv');
   }
@@ -102,17 +126,23 @@ export default function WorklistView({ initialAddress, onBack, themeButton }) {
     const totals = new Map();
     for (const r of gather) {
       const key = shoppingKey(r);
-      const qty = Number(r.payload?.qty) || 1;
-      const summary = summarizeRow({ ...r, payload: { ...r.payload, qty: 1 } })
-        .replace(/^\d+×\s*/, ''); // strip leading "1× " so we can prepend the rolled-up total
+      const isGatherSpec = hasGatherSpec(r);
+      const qty = isGatherSpec ? 1 : (Number(r.payload?.qty) || 1);
+      const summary = isGatherSpec
+        ? r.payload.gather_spec
+        : summarizeRow({ ...r, payload: { ...r.payload, qty: 1 } }).replace(/^\d+×\s*/, '');
+      const category = isGatherSpec ? 'gather_spec' : r.category;
       const cur = totals.get(key);
       if (cur) cur.qty += qty;
-      else totals.set(key, { summary, qty, category: r.category });
+      else totals.set(key, { summary, qty, category });
     }
     const header = ['Category', 'Qty', 'Item'];
     const lines = Array.from(totals.values())
       .sort((a, b) => (a.category < b.category ? -1 : 1))
-      .map(t => [CATEGORY_LABELS[t.category] || t.category, t.qty, t.summary]);
+      .map(t => [
+        t.category === 'gather_spec' ? 'Other' : (CATEGORY_LABELS[t.category] || t.category),
+        t.qty, t.summary,
+      ]);
     const csv = [header, ...lines].map(row => row.map(csvCell).join(',')).join('\n');
     downloadFile(csv, suffixedName('shopping-list'), 'text/csv');
   }
@@ -162,11 +192,14 @@ export default function WorklistView({ initialAddress, onBack, themeButton }) {
         </div>
       )}
 
-      {/* Summary chip */}
+      {/* Summary chip — Done counts each underlying row once even when it
+          appears in both Gather and Tasks (work rows with a gather_spec). */}
       <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-muted)', marginBottom: 18 }}>
         <span><strong style={{ color: 'var(--text-primary)' }}>{gather.length}</strong> Gather</span>
         <span><strong style={{ color: 'var(--text-primary)' }}>{tasks.length}</strong> Tasks</span>
-        <span><strong style={{ color: 'var(--text-primary)' }}>{gather.filter(r => r.done_at).length + tasks.filter(r => r.done_at).length}</strong> Done</span>
+        <span><strong style={{ color: 'var(--text-primary)' }}>{
+          new Set([...gather, ...tasks].filter(r => r.done_at).map(r => r.id)).size
+        }</strong> Done</span>
       </div>
 
       {/* Gather */}
@@ -247,27 +280,33 @@ function renderTasks(tasks, filterAddress, toggleRowField) {
 
 function GatherRow({ row, showAddress, onToggle }) {
   const gathered = !!row.gathered_at;
+  const isWorkGather = hasGatherSpec(row);
   const done = !!row.done_at;
+  const dim = isWorkGather ? gathered : done;
   return (
-    <div style={{ ...rowStyle, opacity: done ? 0.55 : 1 }}>
+    <div style={{ ...rowStyle, opacity: dim ? 0.55 : 1 }}>
       <div style={{
         flex: 1, fontSize: 13,
-        color: done ? 'var(--text-muted)' : 'var(--text-primary)',
-        textDecoration: done ? 'line-through' : 'none',
+        color: dim ? 'var(--text-muted)' : 'var(--text-primary)',
+        textDecoration: dim ? 'line-through' : 'none',
       }}>
-        {summarizeRow(row)}
+        {summarizeGatherRow(row)}
         {showAddress && (
           <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{row.unit_address}</div>
         )}
       </div>
       <Checkbox label="Gathered" checked={gathered} onChange={v => onToggle(row.id, 'gathered_at', v)} />
-      <Checkbox label="Done"     checked={done}     onChange={v => onToggle(row.id, 'done_at', v)} />
+      {!isWorkGather && (
+        <Checkbox label="Done" checked={done} onChange={v => onToggle(row.id, 'done_at', v)} />
+      )}
     </div>
   );
 }
 
 function TaskRow({ row, onToggle }) {
   const done = !!row.done_at;
+  const gatherSpec = hasGatherSpec(row) ? row.payload.gather_spec : null;
+  const partsGathered = gatherSpec && !!row.gathered_at;
   return (
     <div style={{ ...rowStyle, opacity: done ? 0.55 : 1 }}>
       <div style={{
@@ -278,6 +317,11 @@ function TaskRow({ row, onToggle }) {
         {summarizeRow(row)}
         {row.payload?.notes && (
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, fontStyle: 'italic' }}>{row.payload.notes}</div>
+        )}
+        {gatherSpec && (
+          <div style={{ fontSize: 11, marginTop: 3, color: partsGathered ? '#3B6D11' : '#854F0B' }}>
+            {partsGathered ? '✓' : '⏳'} Parts: {gatherSpec}
+          </div>
         )}
       </div>
       <Checkbox label="Done" checked={done} onChange={v => onToggle(row.id, 'done_at', v)} />

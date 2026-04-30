@@ -129,13 +129,14 @@ export function itemsToRows(items, address, { skipPhantoms = false } = {}) {
       if (!val || typeof val !== 'object') continue;
       const condition = val.condition || null;
       const notes = val.notes || '';
+      const gather_spec = val.gather_spec || '';
       const needs_this = !!val.needs_this;
-      if (!condition && !notes.trim() && !needs_this) continue;
+      if (!condition && !notes.trim() && !gather_spec.trim() && !needs_this) continue;
       rows.push({
         unit_address: address,
         category: 'condition',
         item_type: 'work',
-        payload: { item: label, condition, notes },
+        payload: { item: label, condition, notes, gather_spec },
         needs_this,
       });
     }

@@ -7,7 +7,7 @@ import {
   DETECTOR_TYPES, KEY_TYPES,
   PAINT_LOCATIONS, PAINT_COLORS, PAINT_FINISHES,
   CONDITION_GROUPS, OVERALL_CONDITIONS,
-  sectionForConditionItem, CATEGORY_LABELS, summarizeRow,
+  sectionForConditionItem, CATEGORY_LABELS, summarizeRow, summarizeGatherRow, hasGatherSpec,
 } from '../config/turnoverOptions';
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
@@ -121,7 +121,7 @@ export default function TurnoverTab({ unit, accentColor, onOpenWorklist }) {
   const [conditions, setConditions] = useState(() => {
     const init = {};
     CONDITION_GROUPS.forEach(g => g.items.forEach(item => {
-      init[item] = { condition: null, notes: '', needs_this: false };
+      init[item] = { condition: null, notes: '', gather_spec: '', needs_this: false };
     }));
     return init;
   });
@@ -165,7 +165,7 @@ export default function TurnoverTab({ unit, accentColor, onOpenWorklist }) {
               setConditions(prev => {
                 const merged = { ...prev };
                 for (const [k, v] of Object.entries(d.items.conditions)) {
-                  merged[k] = { condition: null, notes: '', needs_this: false, ...v };
+                  merged[k] = { condition: null, notes: '', gather_spec: '', needs_this: false, ...v };
                 }
                 return merged;
               });
@@ -338,7 +338,10 @@ function TurnoverOverview({ rows, inspectionId, inspectionDate, inspector, overa
   }
 
   const needsRows = rows.filter(r => r.needs_this);
-  const gatherRows = needsRows.filter(r => r.item_type === 'purchase');
+  // Work rows with a gather_spec appear in BOTH Gather and Tasks — gathered_at
+  // and done_at are independent columns, so the worker's two checkboxes don't
+  // collide.
+  const gatherRows = needsRows.filter(r => r.item_type === 'purchase' || hasGatherSpec(r));
   const taskRows = needsRows.filter(r => r.item_type === 'work');
 
   // Group gather rows by category for readability
@@ -436,30 +439,38 @@ function TurnoverOverview({ rows, inspectionId, inspectionDate, inspector, overa
 
 function GatherRow({ row, onToggle }) {
   const gathered = !!row.gathered_at;
+  // For work rows with a gather_spec, "Done" lives on the Tasks card. The
+  // Gather card only tracks whether the parts have been picked up.
+  const isWorkGather = hasGatherSpec(row);
   const done = !!row.done_at;
+  const dim = isWorkGather ? gathered : done;
   return (
     <div style={{
       ...itemBlockStyle,
       display: 'flex', alignItems: 'center', gap: 10,
       padding: '10px 12px', marginBottom: 6,
-      opacity: done ? 0.55 : 1,
+      opacity: dim ? 0.55 : 1,
     }}>
       <div style={{
         flex: 1, fontSize: 13,
-        color: done ? 'var(--text-muted)' : 'var(--text-primary)',
-        textDecoration: done ? 'line-through' : 'none',
+        color: dim ? 'var(--text-muted)' : 'var(--text-primary)',
+        textDecoration: dim ? 'line-through' : 'none',
       }}>
-        {summarizeRow(row)}
-        {row.done_by && done && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-dim)' }}>· {row.done_by}</span>}
+        {summarizeGatherRow(row)}
+        {row.done_by && done && !isWorkGather && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-dim)' }}>· {row.done_by}</span>}
       </div>
       <Checkbox label="Gathered" checked={gathered} onChange={v => onToggle(row.id, 'gathered_at', v)} />
-      <Checkbox label="Done"     checked={done}     onChange={v => onToggle(row.id, 'done_at', v)} />
+      {!isWorkGather && (
+        <Checkbox label="Done" checked={done} onChange={v => onToggle(row.id, 'done_at', v)} />
+      )}
     </div>
   );
 }
 
 function TaskRow({ row, onToggle }) {
   const done = !!row.done_at;
+  const gatherSpec = hasGatherSpec(row) ? row.payload.gather_spec : null;
+  const partsGathered = gatherSpec && !!row.gathered_at;
   return (
     <div style={{
       ...itemBlockStyle,
@@ -474,6 +485,11 @@ function TaskRow({ row, onToggle }) {
       }}>
         {summarizeRow(row)}
         {row.payload?.notes && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, fontStyle: 'italic' }}>{row.payload.notes}</div>}
+        {gatherSpec && (
+          <div style={{ fontSize: 11, marginTop: 3, color: partsGathered ? '#3B6D11' : '#854F0B' }}>
+            {partsGathered ? '✓' : '⏳'} Parts: {gatherSpec}
+          </div>
+        )}
       </div>
       <Checkbox label="Done" checked={done} onChange={v => onToggle(row.id, 'done_at', v)} />
     </div>
@@ -676,9 +692,15 @@ function TurnoverEdit(props) {
                 style={{ ...toggleBaseStyle, background: c.purchaseNeeded === false ? '#EAF3DE' : 'var(--bg-surface)', border: `1px solid ${c.purchaseNeeded === false ? '#639922' : 'var(--border-default)'}`, color: c.purchaseNeeded === false ? '#3B6D11' : 'var(--text-muted)' }}
               >Tasks</button>
             </div>
+            {c.needs_this && c.purchaseNeeded === false && (
+              <GatherSpecField
+                value={c.gather_spec || ''}
+                onChange={v => updateList(setCustomItems, i, 'gather_spec', v)}
+              />
+            )}
           </div>
         ))}
-        <button style={addBtnStyle} onClick={() => setCustomItems(p => [...p, { name: '', spec: '', qty: 1, needs_this: false, purchaseNeeded: true }])}>+ add item</button>
+        <button style={addBtnStyle} onClick={() => setCustomItems(p => [...p, { name: '', spec: '', qty: 1, needs_this: false, purchaseNeeded: true, gather_spec: '' }])}>+ add item</button>
       </ReplacementBlock>
 
       <div style={dividerStyle} />
@@ -704,9 +726,15 @@ function TurnoverEdit(props) {
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
             <NeedToggle value={!!p.needs_this} onChange={v => setNeed(setPaintRows, i, v)} />
           </div>
+          {p.needs_this && (
+            <GatherSpecField
+              value={p.gather_spec || ''}
+              onChange={v => updateList(setPaintRows, i, 'gather_spec', v)}
+            />
+          )}
         </div>
       ))}
-      <button style={addBtnStyle} onClick={() => setPaintRows(p => [...p, { location: 'Living room', color: 'White', finish: 'Semi-gloss', condition: null, notes: '', customColor: '', needs_this: false }])}>+ add area</button>
+      <button style={addBtnStyle} onClick={() => setPaintRows(p => [...p, { location: 'Living room', color: 'White', finish: 'Semi-gloss', condition: null, notes: '', customColor: '', gather_spec: '', needs_this: false }])}>+ add area</button>
 
       <div style={dividerStyle} />
 
@@ -720,7 +748,7 @@ function TurnoverEdit(props) {
             {group.section}
           </div>
           {group.items.map(item => {
-            const c = conditions[item] || { condition: null, notes: '', needs_this: false };
+            const c = conditions[item] || { condition: null, notes: '', gather_spec: '', needs_this: false };
             return (
               <div key={item} style={{ ...itemBlockStyle, marginBottom: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
@@ -740,6 +768,12 @@ function TurnoverEdit(props) {
                   onChange={e => setConditions(prev => ({ ...prev, [item]: { ...c, notes: e.target.value } }))}
                   placeholder="Notes..."
                 />
+                {c.needs_this && (
+                  <GatherSpecField
+                    value={c.gather_spec || ''}
+                    onChange={v => setConditions(prev => ({ ...prev, [item]: { ...c, gather_spec: v } }))}
+                  />
+                )}
               </div>
             );
           })}
@@ -874,6 +908,24 @@ function NeedToggle({ value, onChange }) {
     >
       {value ? '✓ Need' : 'Need?'}
     </button>
+  );
+}
+
+// Free-text "to gather" field that surfaces only when a work row is flagged
+// Need?. Anything typed here puts the row in the Gather list with this label,
+// in addition to its existing Tasks list entry. Empty = not gathered, no
+// Gather entry rendered.
+function GatherSpecField({ value, onChange }) {
+  return (
+    <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>To gather:</span>
+      <input
+        style={{ ...inputStyle, fontSize: 12, padding: '5px 8px' }}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder='e.g. "door closers (2)", "weatherstripping kit"'
+      />
+    </div>
   );
 }
 
