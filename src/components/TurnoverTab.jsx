@@ -208,7 +208,7 @@ export default function TurnoverTab({ unit, accentColor, onOpenWorklist }) {
         const j = await res.json();
         if (j.inspection_id) setInspectionId(j.inspection_id);
         setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
+        setTimeout(() => { setSaved(false); setView('overview'); }, 1500);
         // Refetch rows so Overview reflects post-save state including new ids.
         try {
           const r2 = await fetch(`/api/get-inspection?address=${encodeURIComponent(unit.address)}`);
