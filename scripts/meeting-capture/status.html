@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recording Status</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2.5rem;
+      transition: background-color 0.6s ease, color 0.6s ease;
+      overflow: hidden;
+    }
+
+    body.off {
+      background-color: #0a1a0e;
+      color: #4ade80;
+    }
+
+    body.on {
+      background-color: #1a0505;
+      color: #f87171;
+    }
+
+    /* Pulsing glow behind the icon when recording */
+    .pulse-ring {
+      position: absolute;
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      background: transparent;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    body.on .pulse-ring {
+      animation: pulse 1.8s ease-out infinite;
+      border: 3px solid rgba(248, 113, 113, 0.6);
+    }
+
+    @keyframes pulse {
+      0%   { transform: scale(0.85); opacity: 0.8; }
+      100% { transform: scale(1.6);  opacity: 0; }
+    }
+
+    .icon-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 120px;
+      height: 120px;
+    }
+
+    .mic-icon {
+      font-size: 96px;
+      line-height: 1;
+      transition: filter 0.4s ease;
+      position: relative;
+      z-index: 1;
+    }
+
+    body.on .mic-icon {
+      filter: drop-shadow(0 0 24px rgba(248, 113, 113, 0.9));
+    }
+
+    body.off .mic-icon {
+      filter: grayscale(0.4) brightness(0.7);
+    }
+
+    .headline {
+      font-size: clamp(2.4rem, 8vw, 5rem);
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      text-align: center;
+      line-height: 1.05;
+      text-transform: uppercase;
+      transition: color 0.4s ease;
+    }
+
+    body.on .headline {
+      animation: flicker 3s ease-in-out infinite;
+    }
+
+    @keyframes flicker {
+      0%, 92%, 100% { opacity: 1; }
+      94%           { opacity: 0.85; }
+      96%           { opacity: 1; }
+      98%           { opacity: 0.9; }
+    }
+
+    .subtext {
+      font-size: clamp(1.1rem, 3vw, 1.6rem);
+      font-weight: 500;
+      opacity: 0.65;
+      text-align: center;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .btn {
+      margin-top: 1rem;
+      padding: 1.1rem 3.5rem;
+      font-size: clamp(1rem, 2.5vw, 1.35rem);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+      outline: none;
+    }
+
+    body.off .btn {
+      background-color: #4ade80;
+      color: #052e16;
+      box-shadow: 0 0 32px rgba(74, 222, 128, 0.35);
+    }
+
+    body.off .btn:hover {
+      transform: scale(1.04);
+      box-shadow: 0 0 48px rgba(74, 222, 128, 0.55);
+    }
+
+    body.on .btn {
+      background-color: #f87171;
+      color: #450a0a;
+      box-shadow: 0 0 32px rgba(248, 113, 113, 0.45);
+    }
+
+    body.on .btn:hover {
+      transform: scale(1.04);
+      box-shadow: 0 0 48px rgba(248, 113, 113, 0.65);
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .status-dot {
+      position: fixed;
+      bottom: 1.8rem;
+      right: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      opacity: 0.4;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    body.on .dot {
+      animation: blink 1s step-start infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+  </style>
+</head>
+<body class="off">
+
+  <div class="pulse-ring"></div>
+
+  <div class="icon-wrap">
+    <div class="mic-icon" id="icon">🎙️</div>
+  </div>
+
+  <div class="headline" id="headline">Go Ahead and Talk Shit</div>
+  <div class="subtext" id="subtext">Recording is currently OFF</div>
+
+  <button class="btn" id="toggleBtn" onclick="toggle()">Start Recording</button>
+
+  <div class="status-dot">
+    <div class="dot"></div>
+    <span id="statusLabel">Idle</span>
+  </div>
+
+  <script>
+    let recording = false;
+    let pollTimer = null;
+
+    function applyState(isRecording) {
+      recording = isRecording;
+      const body = document.body;
+      const headline = document.getElementById('headline');
+      const subtext  = document.getElementById('subtext');
+      const btn      = document.getElementById('toggleBtn');
+      const label    = document.getElementById('statusLabel');
+
+      if (isRecording) {
+        body.className = 'on';
+        headline.textContent = 'Big Brother Is Listening';
+        subtext.textContent  = 'Recording is currently ACTIVE';
+        btn.textContent      = 'Stop Recording';
+        label.textContent    = 'Recording';
+      } else {
+        body.className = 'off';
+        headline.textContent = 'Go Ahead and Talk Shit';
+        subtext.textContent  = 'Recording is currently OFF';
+        btn.textContent      = 'Start Recording';
+        label.textContent    = 'Idle';
+      }
+    }
+
+    async function poll() {
+      try {
+        const res = await fetch('/status');
+        const data = await res.json();
+        applyState(data.recording);
+      } catch {
+        // server not reachable — don't crash
+      }
+    }
+
+    async function toggle() {
+      const btn = document.getElementById('toggleBtn');
+      btn.disabled = true;
+      btn.textContent = recording ? 'Stopping…' : 'Starting…';
+
+      try {
+        const res = await fetch('/toggle', { method: 'POST' });
+        const data = await res.json();
+        applyState(data.recording);
+      } catch {
+        // fall back to next poll cycle
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // Poll every 2 seconds
+    poll();
+    pollTimer = setInterval(poll, 2000);
+  </script>
+
+</body>
+</html>

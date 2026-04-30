@@ -119,6 +119,7 @@ Mappings live in `src/config/tenantInfoColumns.js`. Lookup is by **header name**
 | `save-calendar-task` | POST | Upsert calendar task (id present → update, else insert) |
 | `delete-calendar-task` | POST | Delete calendar task by `{ id }` |
 | `trigger-sync` | POST | Dispatches GitHub Actions `sync-neo.yml` workflow via `workflow_dispatch`. Requires `GH_DISPATCH_TOKEN` env var (actions:write scope). Returns `{ ok: true }` on 204 from GitHub. |
+| `recording-status` | GET / POST | Backs the inline REC pill in the dashboard header. GET is public; returns `{ recording, since, updatedAt }`. POST is gated by the `X-Recording-Secret` header matching the `RECORDING_SECRET` env var; body `{ recording: bool }`. State stored in a Netlify Blob (`recording-status` store). Pushed by `scripts/meeting-capture/record-meeting.sh` on start/stop. |
 
 ### Column Config (`src/config/columns.js`)
 Single source of truth for the property-info-clean tab ↔ field key mapping, used by `get-property-info.js`, `update-property-info.js`, and `sync-from-neo.mjs`. **Add new property-side fields here only.**
@@ -265,6 +266,15 @@ Goal: split Property and Turnover tabs into glanceable Overview + structured Edi
 - Draft inspections render the corner triangle as a **dashed hollow outline** (same color, no fill). Tooltip becomes `<condition> (in progress) · <age>`.
 - Age label and condition flag render independently — no condition rated still shows the age; no inspection at all shows neither.
 
+## Recording Status Indicator
+
+Inline REC pill in the dashboard header (next to the "Synced" indicator) that appears only when the meeting Mac is actively recording. Addresses Andrea's privacy concern: she wants to know when the computer is listening to her, visible wherever she's already looking on the dashboard.
+
+- **UI**: red pill with blinking dot + "REC" text, rendered in `src/App.jsx` (header indicator block). Hidden when not recording. Polls `/api/recording-status` every 4s. The blinking is driven by `.rec-dot { animation: pulse 1.2s ... }` in `src/index.css` (reuses the existing `@keyframes pulse`).
+- **Function**: `netlify/functions/recording-status.js` — Netlify Blobs storage (no SQL). GET is public, POST requires `X-Recording-Secret` header.
+- **Local-only fallback**: `scripts/meeting-capture/status-server.js` + `status.html` — same UX served on `localhost:2626`, watches `/tmp/meetings/recording.pid` directly. Useful for the Mac itself or a tablet on the same LAN if the cloud is down.
+- **Wiring**: `record-meeting.sh` calls `publish_status true` after starting ffmpeg and `publish_status false` after killing it. Best-effort `curl` (5s timeout, backgrounded with `&`) — never blocks recording even if the network is offline. Requires `RECORDING_STATUS_URL` and `RECORDING_SECRET` in `meeting-capture.env`; if either is missing the function is a no-op.
+
 ## Key Decisions (April 2026)
 
 ### Sync Button + Change Email
@@ -386,6 +396,7 @@ npx netlify dev  # Runs on port 8888, proxies /api to Netlify functions
 - `GMAIL_USER` — Gmail address for sending change summary emails (optional)
 - `GMAIL_APP_PASSWORD` — Gmail app password (optional)
 - `MEETING_EMAIL_TO` — recipient for change-summary emails (optional)
+- `RECORDING_SECRET` — shared secret protecting `POST /api/recording-status`. Set in Netlify env vars **and** in `scripts/meeting-capture/meeting-capture.env` on the recording Mac. Any random ~32-char string works (e.g. `openssl rand -hex 16`).
 
 **GitHub Actions secrets** (used by `.github/workflows/sync-neo.yml`): `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SHEET_ID_PROPERTY_INFO`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `MEETING_EMAIL_TO`. The pre-Neo `NUMBERS_FILE_ID` secret is no longer used — safe to delete or leave.
 - `MEETING_EMAIL_TO` — Recipient address for sync change emails + meeting summaries (optional)
