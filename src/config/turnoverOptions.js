@@ -9,10 +9,7 @@
  */
 
 // To add/remove options, edit this array — no other code changes needed.
-export const BLIND_WIDTHS = ['23"', '24"', '27"', '29"', '30"', '31"', '34"', '35"', '36"', '46"', '48"', '58"', '60"', '64"', 'Custom'];
-
-// To add/remove options, edit this array — no other code changes needed.
-export const BLIND_DROPS = ['36"', '42"', '48"', '54"', '60"', '64"', '72"', '84"'];
+export const BLIND_HEIGHTS = ['42"', '64"'];
 
 // To add/remove options, edit this array — no other code changes needed.
 export const BULB_TYPES = ['A19 E26 (standard)', 'A15 E26 (appliance)', 'B11 E12 (candelabra)', 'BR30 (flood)', 'PAR38 (outdoor)', 'GU10 (track)', 'T8 fluorescent', 'Other'];
@@ -101,7 +98,7 @@ export const CATEGORY_LABELS = {
 export function summarizeRow(row) {
   const p = row.payload || {};
   switch (row.category) {
-    case 'blinds':       return `${p.qty || 1}× Blinds ${p.width || ''} × ${p.drop || ''}`;
+    case 'blinds':       return `${p.qty || 1}× Blinds ${p.height || p.drop || ''}`;
     case 'bulbs':        return `${p.qty || 1}× ${p.type || 'Bulb'}${p.temp ? ` — ${p.temp}` : ''}`;
     case 'stove_parts':  return `${p.qty || 1}× ${p.type || 'Stove part'}${p.brand ? ` (${p.brand})` : ''}`;
     case 'toilet_seats': return `${p.qty || 1}× Toilet seat — ${p.shape || ''}`;
