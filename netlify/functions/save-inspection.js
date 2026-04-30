@@ -139,7 +139,15 @@ const CONDITION_LABELS = {
 
 async function sendSummaryEmail({ address, inspection, itemRows }) {
   const { GMAIL_USER, GMAIL_APP_PASSWORD, MEETING_EMAIL_TO } = process.env;
-  if (!GMAIL_USER || !GMAIL_APP_PASSWORD || !MEETING_EMAIL_TO) return;
+  const missing = [];
+  if (!GMAIL_USER) missing.push('GMAIL_USER');
+  if (!GMAIL_APP_PASSWORD) missing.push('GMAIL_APP_PASSWORD');
+  if (!MEETING_EMAIL_TO) missing.push('MEETING_EMAIL_TO');
+  if (missing.length > 0) {
+    console.warn(`[save-inspection] ✉ Skipping email — missing env var(s): ${missing.join(', ')}`);
+    return;
+  }
+  console.log(`[save-inspection] ✉ Sending email from ${GMAIL_USER} → ${MEETING_EMAIL_TO}`);
 
   try {
     const flagged = itemRows.filter(r => r.needs_this);
