@@ -19,9 +19,8 @@
  * Required env vars:
  *   SUPABASE_URL, SUPABASE_SERVICE_KEY
  *
- * Optional env vars (summary email via Resend — skipped if any are missing):
- *   RESEND_API_KEY, MEETING_EMAIL_TO
- *   RESEND_FROM (optional, default "Mills Dashboard <onboarding@resend.dev>")
+ * Optional env vars (summary email via Gmail — skipped if any are missing):
+ *   GMAIL_USER, GMAIL_APP_PASSWORD, MEETING_EMAIL_TO
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -139,16 +138,15 @@ const CONDITION_LABELS = {
 };
 
 async function sendSummaryEmail({ address, inspection, itemRows }) {
-  const { RESEND_API_KEY, RESEND_FROM, MEETING_EMAIL_TO } = process.env;
+  const { BREVO_API_KEY, MEETING_EMAIL_TO } = process.env;
   const missing = [];
-  if (!RESEND_API_KEY) missing.push('RESEND_API_KEY');
+  if (!BREVO_API_KEY) missing.push('BREVO_API_KEY');
   if (!MEETING_EMAIL_TO) missing.push('MEETING_EMAIL_TO');
   if (missing.length > 0) {
     console.warn(`[save-inspection] ✉ Skipping email — missing env var(s): ${missing.join(', ')}`);
     return;
   }
-  const from = RESEND_FROM || 'Mills Dashboard <onboarding@resend.dev>';
-  console.log(`[save-inspection] ✉ Sending email from ${from} → ${MEETING_EMAIL_TO}`);
+  console.log(`[save-inspection] ✉ Sending email → ${MEETING_EMAIL_TO}`);
 
   try {
     const flagged = itemRows.filter(r => r.needs_this);
@@ -179,22 +177,19 @@ async function sendSummaryEmail({ address, inspection, itemRows }) {
       }
     }
 
-    const res = await fetch('https://api.resend.com/emails', {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from,
-        to: [MEETING_EMAIL_TO],
+        sender: { name: 'Mills Dashboard', email: 'nathan@millsrentals.com' },
+        to: [{ email: MEETING_EMAIL_TO }],
         subject: `Inspection ${isDraft ? 'draft ' : ''}saved: ${address} — ${conditionLabel}`,
-        text: lines.join('\n'),
+        textContent: lines.join('\n'),
       }),
     });
     if (!res.ok) {
       const errBody = await res.text();
-      throw new Error(`Resend ${res.status}: ${errBody}`);
+      throw new Error(`Brevo ${res.status}: ${errBody}`);
     }
     console.log(`[save-inspection] ✉ Summary email sent for "${address}"`);
   } catch (err) {
