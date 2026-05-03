@@ -175,6 +175,17 @@ async function sendSummaryEmail({ address, inspection, itemRows }) {
   const conditionLabel = CONDITION_LABELS[inspection.overall_condition] || inspection.overall_condition || '—';
   const isDraft = inspection.status === 'draft';
 
+  // Observations: paint rows + condition rows the inspector documented but
+  // didn't flag for action. The Need? toggle gates "is this work to do?"; it
+  // shouldn't gate "should the team see what I noticed". Paint rows are
+  // always surfaced (they represent intentional documentation effort), and
+  // condition rows are surfaced when they carry free-text notes.
+  const paintObs = itemRows.filter(r => r.category === 'paint' && !r.needs_this);
+  const conditionObs = itemRows.filter(r =>
+    r.category === 'condition' && !r.needs_this &&
+    ((r.payload?.notes || '').trim() || r.payload?.condition)
+  );
+
   const lines = [
     `Address: ${address}`,
     `Inspector: ${inspection.inspector || '—'}`,
@@ -198,6 +209,24 @@ async function sendSummaryEmail({ address, inspection, itemRows }) {
       // condition row also had a condition rating set.
       const annot = [p.condition, p.spec, p.notes].filter(Boolean).join(' — ');
       lines.push(`  • [${r.item_type === 'purchase' ? 'Gather' : 'Task'}] ${r.category} — ${desc}${annot ? ` (${annot})` : ''}`);
+    }
+  }
+  if (paintObs.length > 0) {
+    lines.push('', '— Paint —');
+    for (const r of paintObs) {
+      const p = r.payload || {};
+      const desc = describeRow('paint', p);
+      const annot = [p.condition, p.notes].filter(Boolean).join(' — ');
+      lines.push(`  • ${desc}${annot ? ` (${annot})` : ''}`);
+    }
+  }
+  if (conditionObs.length > 0) {
+    lines.push('', '— Condition notes —');
+    for (const r of conditionObs) {
+      const p = r.payload || {};
+      const desc = describeRow('condition', p);
+      const annot = [p.condition, p.notes].filter(Boolean).join(' — ');
+      lines.push(`  • ${desc}${annot ? ` (${annot})` : ''}`);
     }
   }
 
