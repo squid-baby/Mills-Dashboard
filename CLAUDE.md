@@ -65,7 +65,7 @@ Header-based lookup with aliases — see `src/config/tenantInfoColumns.js`. The 
 - `next_residents` — one row per future resident (name, email, phone, move_in_date)
 - `unit_full` — view joining units + residents + next_residents (reference only; `get-units.js` queries tables directly to get all fields including phone and move_out_date)
 - `notes` — per-unit notes (id, unit_id (UUID FK to units), **body**, created_by, created_at). API contract is **address-keyed** (Phase 1C bugfix, April 2026): `get-notes` / `save-note` accept `address`, do the UUID lookup server-side. Don't pass `unit.id` from the frontend — it's a sequential int (see `buildUnit`), not the Supabase UUID.
-- `inspections` — per-unit inspection records (id, unit_id, **unit_address** (Phase 1A — preferred key now, mirrors `calendar_tasks`), inspector, inspection_date, overall_condition, overall_notes, items_json, **status** ('draft'|'complete', Phase 1A), **turnover_year** (Phase 1A), created_at, updated_at). One row per unit_address (latest wins) — `save-inspection.js` upserts by `unit_address`.
+- `inspections` — per-unit inspection records (id, unit_id, **unit_address** (Phase 1A — preferred key now, mirrors `calendar_tasks`), inspector, inspection_date, overall_condition, overall_notes, items_json, **status** ('draft'|'complete', Phase 1A), **turnover_year** (Phase 1A), **cleaned_at / cleaned_by / cleaned_notes** (May 2026), **finalized_at / finalized_by / finalized_notes** (May 2026), **tasks_complete_email_sent_at** (May 2026 — idempotency marker for the "all flagged tasks done" email), created_at, updated_at). One row per unit_address (latest wins) — `save-inspection.js` upserts by `unit_address`.
 - `inspection_items` (Phase 1A, April 2026) — one row per inspectable item, normalized for Worklist + Turnover Overview queries. `(id, inspection_id (FK, ON DELETE CASCADE), unit_address, category, item_type, payload jsonb, needs_this, gathered_at, done_at, done_by, created_at, updated_at)`. Categories: `blinds | bulbs | stove_parts | toilet_seats | outlets | detectors | keys | paint | condition | custom`. `item_type`: `purchase` (orderable goods) | `work` (tasks done on-site).
 - `calendar_tasks` — turnover calendar tasks (id uuid, unit_address text, task_type, start_date, start_slot, end_date, end_slot, crew, notes, status, created_at, updated_at)
 - `pending_changes`, `sync_log` — supporting tables
@@ -75,6 +75,8 @@ Header-based lookup with aliases — see `src/config/tenantInfoColumns.js`. The 
 **Phase 1A SQL (already run, April 2026):** [`db/migrations/2026-04-29-expand-inspections-for-worklist.sql`](db/migrations/2026-04-29-expand-inspections-for-worklist.sql) — adds `status` / `turnover_year` / `unit_address` to `inspections` + creates `inspection_items` table.
 
 **Phase 1B SQL (already run, April 2026):** [`db/migrations/2026-04-29-expand-units-for-specs.sql`](db/migrations/2026-04-29-expand-units-for-specs.sql) — adds `outlet_standard_color text` to `units`.
+
+**Turnover stages SQL (already run, May 2026):** [`db/migrations/2026-05-03-add-inspection-stages.sql`](db/migrations/2026-05-03-add-inspection-stages.sql) — adds `cleaned_at / cleaned_by / cleaned_notes`, `finalized_at / finalized_by / finalized_notes`, and `tasks_complete_email_sent_at` to `inspections`. Powers the new Cleaned/Finalized buttons + the all-tasks-done notification email.
 
 ### Tenant Info column mapping (header-name based, source-agnostic)
 Mappings live in `src/config/tenantInfoColumns.js`. Lookup is by **header name** (case-insensitive, smart-quote-tolerant); column position is irrelevant. Each field key carries aliases — current Neo header first, then prior names — so renaming columns in Neo won't break the sync.
@@ -108,10 +110,11 @@ Mappings live in `src/config/tenantInfoColumns.js`. Lookup is by **header name**
 | `get-units` | GET | Queries Supabase `units` with embedded `residents` + `next_residents`, derives status groups |
 | `get-property-info` | GET | Fetches property fields from Google Sheet (all fields in `src/config/columns.js`) |
 | `update-property-info` | POST | Updates a property field in Google Sheet + appends history |
-| `save-inspection` | POST | Upserts inspection to Supabase `inspections` (one row per unit_address; latest wins) + replaces `inspection_items` rows (Phase 1C: lifts `needs_this` / `purchaseNeeded` out of payload onto top-level columns). Returns `inspection_id`. |
-| `get-inspection` | GET | Reads `inspections` row by `unit_address` from Supabase. Returns the legacy `items` blob shape (for the Edit form) **and** the raw `inspection_items` `rows` array (for the Overview's Gather/Tasks). |
+| `save-inspection` | POST | Upserts inspection to Supabase `inspections` (one row per unit_address; latest wins) + replaces `inspection_items` rows (Phase 1C: lifts `needs_this` / `purchaseNeeded` out of payload onto top-level columns). Sends "Inspection Status: Complete" email via Brevo. Re-arms the all-tasks-done marker (`tasks_complete_email_sent_at` cleared) when this save introduces flagged work. Returns `inspection_id`. |
+| `get-inspection` | GET | Reads `inspections` row by `unit_address` from Supabase. Returns the legacy `items` blob shape (for the Edit form), the raw `inspection_items` `rows` array (for the Overview's Gather/Tasks), and the lifecycle stage fields (`cleanedAt/By/Notes`, `finalizedAt/By/Notes`, `tasksCompleteAt`). |
 | `get-all-inspections` | GET | Returns `{ unit_address → { condition, date, status } }` (Phase 1F: was just `condition`). Drives tile flags, age labels, and draft styling. |
-| `save-inspection-item-state` | POST | Phase 1C. Flips a single `inspection_items` row's `gathered_at` / `done_at` (with optional `done_by`). Used by Overview + Worklist checkbox toggles. |
+| `save-inspection-item-state` | POST | Phase 1C. Flips a single `inspection_items` row's `gathered_at` / `done_at` (with optional `done_by`). Used by Overview + Worklist checkbox toggles. **May 2026:** when a `done_at` toggle completes the last open flagged item on the parent inspection, sends "Turnover Task Status: Complete" email — idempotent via conditional `WHERE tasks_complete_email_sent_at IS NULL` update so concurrent toggles can't double-fire. |
+| `mark-inspection-stage` | POST | May 2026. Records a turnover lifecycle stage on the latest inspection for an address. Body `{ address, stage: 'cleaned' \| 'finalized', notes?, by?, undo?, forceEmail? }`. First transition stamps `<stage>_at` and emails ("Cleaning Status: Complete" / "Turnover Status: Finalized"); re-edits update notes silently unless `forceEmail: true`. Race-safe via conditional `WHERE <stage>_at IS NULL` update on first transition. |
 | `get-worklist-items` | GET | Phase 1D. Returns every `inspection_items` row where `needs_this = true`. Optional `?address=` and `?done=pending\|complete` filters. |
 | `get-notes` | GET | Phase 1C bugfix: address-keyed (`?address=...`). Looks up `units.id` UUID server-side, returns notes ordered newest first. |
 | `save-note` | POST | Phase 1C bugfix: body shape `{ address, body, created_by }`. Looks up `units.id` UUID server-side, inserts with `body` (not `text` — that column doesn't exist). |
@@ -335,6 +338,29 @@ Inline REC pill in the dashboard header (next to the "Synced" indicator) that ap
 - "Export Turnovers" button (header) produces a per-property summary CSV (Phase 1E rebuild): counts of Gather Pending/Done, Tasks Pending/Done, % Complete, plus Last Inspected / Days Ago / Status. Line-item detail moved to the Worklist's Export CSV.
 - `Resident Notes` = `unit.notes` (from Tenant Info). `Dashboard Notes` = Supabase `notes` table. `Inspection Notes` = `inspections.overall_notes`.
 
+### Turnover Lifecycle Emails (May 2026)
+The Turnover Overview captures the full handoff sequence with four notification emails (all via Brevo, gated by `BREVO_API_KEY` + `MEETING_EMAIL_TO`). All four flow through `src/lib/sendStageEmail.js` so the envelope is consistent.
+
+| Trigger | Email subject | Body header | Sender |
+|---------|---------------|-------------|--------|
+| Inspector clicks **Save Inspection** | `Inspection saved: <address> — <condition>` | `Inspection Status: Complete` | `save-inspection.js` |
+| Last open flagged item gets checked Done in Overview | `Turnover tasks complete: <address>` | `Turnover Task Status: Complete` | `save-inspection-item-state.js` |
+| Cleaner clicks **Cleaned** + Save | `Cleaning complete: <address>` | `Cleaning Status: Complete` | `mark-inspection-stage.js` |
+| Someone clicks **Finalized** + Save | `Turnover finalized: <address>` | `Turnover Status: Finalized` | `mark-inspection-stage.js` |
+
+**Buttons:** Cleaned and Finalized live next to the Edit pencil in the Overview header, hidden in Edit view. Both render as "Mark <Stage>" when pending, morph to "✓ <Stage> · 2d ago" once stamped, and are disabled when no inspection exists yet. Each opens a `TurnoverStageModal` capturing optional notes that ride out with the email.
+
+**Re-edit semantics:** First click stamps `<stage>_at` and fires the email. Re-clicking opens the same modal pre-filled with existing notes; `Save changes` updates silently (no email). A small `Save & resend email` link in the modal's footer lets a worker explicitly re-notify (e.g. they discovered something new an hour later) — this passes `forceEmail: true` to `mark-inspection-stage` and shows an inline "Email resent to team" toast on success.
+
+**Idempotency:**
+- "All tasks complete" email is gated by `inspections.tasks_complete_email_sent_at`. Un-checking and re-checking the last box never duplicates the email. The marker is cleared by `save-inspection.js` whenever a save introduces new flagged work, so legitimate re-completions still fire.
+- Cleaned/Finalized first-transition emails use a conditional `WHERE <stage>_at IS NULL` SQL update with `.select()` — concurrent clicks lose the race and fall through to the silent re-edit path. No double emails even with two cleaners hitting the button simultaneously.
+- Email failures never block the underlying state mutation. `sendStageEmail` is fully best-effort (try/catch, log, return).
+
+**Soft guidance, not hard blocks:** Finalized is clickable even if Cleaned hasn't been recorded; the modal shows a small `⚠ Cleaned hasn't been recorded yet — finalize anyway?` warning. Pro UX is forgiving — workers who know what they're doing aren't forced through artificial gates.
+
+**Note attribution stays clean:** Cleaner/finalizer comments live in dedicated `cleaned_notes` / `finalized_notes` columns, never appended to the inspector's `overall_notes`. Each renders as its own labeled card in the Overview under the summary line, and emails surface them under their own headings.
+
 ### Worklist (Phase 1D)
 - Top-level view via the `Worklist` header button. Aggregates `inspection_items WHERE needs_this = true` across every property.
 - Property selector at top scopes the view; default is "All properties (N)".
@@ -379,6 +405,14 @@ Inline REC pill in the dashboard header (next to the "Synced" indicator) that ap
 **Tile shows the wrong "Xd ago"** — Age is computed from `inspection_date` (a YYYY-MM-DD string). If the inspector picked a date in the future, the label hides (treated as "no age"). If the date is wrong in the data, edit the inspection.
 
 **Tile flag is dashed/hollow when I expected solid** — That's the draft-inspection style (Phase 1F). The inspection has `status='draft'`. Open it, save again — `save-inspection.js` writes `status='complete'` by default unless the inspection passes one explicitly.
+
+**Cleaned / Finalized button is disabled** — The unit has no inspection saved yet. The lifecycle stages key off the latest `inspections` row for that `unit_address`; without one there's nothing to stamp. Click Edit, fill out the form, Save Inspection — the buttons enable.
+
+**Cleaned / Finalized email didn't arrive** — Check Netlify function logs for `[mark-cleaned]` / `[mark-finalized]` log lines. `BREVO_API_KEY` and `MEETING_EMAIL_TO` are required; same env vars the existing inspection-save email uses, so if those work the new ones should too. Re-edits are silent by design — only the first click that stamps `<stage>_at` emails. Use "Save & resend email" link in the modal to force a resend.
+
+**"Turnover tasks complete" email didn't fire when I checked the last box** — Check `inspections.tasks_complete_email_sent_at` for the unit. If it's already set, the idempotency guard skipped — un-check + re-check loops won't re-trigger. The marker is cleared automatically when the inspector saves with new flagged items; if you need to force a re-send manually, set the column back to NULL in Supabase.
+
+**Inspector's paint or condition NOTES are missing from the saved-inspection email** — Pre–May 2026 bug: `save-inspection.js` rendered `condition || spec || notes` (fallback chain), so the free-text Notes field was silently dropped whenever a condition rating was also set. Fixed — they now render together separated by em dashes. If you see this on an old email, re-save the inspection.
 
 ## Dev Setup
 ```bash
