@@ -19,12 +19,13 @@
  * Required env vars:
  *   SUPABASE_URL, SUPABASE_SERVICE_KEY
  *
- * Optional env vars (summary email via Gmail — skipped if any are missing):
- *   GMAIL_USER, GMAIL_APP_PASSWORD, MEETING_EMAIL_TO
+ * Optional env vars (summary email via Brevo — skipped if any are missing):
+ *   BREVO_API_KEY, MEETING_EMAIL_TO
  */
 
 import { createClient } from '@supabase/supabase-js';
 import { itemsToRows } from '../../src/lib/inspectionItems.js';
+import { sendStageEmail } from '../../src/lib/sendStageEmail.js';
 
 export async function handler(event) {
   if (event.httpMethod !== 'POST') {
@@ -112,6 +113,21 @@ export async function handler(event) {
       if (insErr) throw new Error(`insert items: ${insErr.message}`);
     }
 
+    // Re-arm the "all turnover tasks done" notification when this save introduces
+    // any new flagged work. Without this, an inspector who flags additional items
+    // after the property already hit "all done" would never trigger another email.
+    // We always reset to null on save: any flagged-but-not-done row legitimately
+    // means the property is no longer "all done", and save-inspection-item-state
+    // re-sets the marker the moment the last open item is checked off.
+    const hasOpenFlaggedWork = itemRows.some(r => r.needs_this);
+    if (hasOpenFlaggedWork) {
+      const { error: clearErr } = await supabase
+        .from('inspections')
+        .update({ tasks_complete_email_sent_at: null })
+        .eq('id', inspectionId);
+      if (clearErr) console.warn(`[save-inspection] clear tasks_complete marker: ${clearErr.message}`);
+    }
+
     console.log(`[save-inspection] OK — "${address}" | ${itemRows.length} items | ${Date.now() - t0}ms`);
 
     await sendSummaryEmail({ address, inspection: inspectionRow, itemRows });
@@ -137,62 +153,57 @@ const CONDITION_LABELS = {
   at_risk: 'At risk',
 };
 
+const capitalize = s => (s ? s[0].toUpperCase() + s.slice(1) : '');
+
+// Build a human-readable description of an inspection_items row's payload.
+// Paint rows pack location, color, finish — render them all so the email
+// reader has full context. Other categories use whichever identifier field
+// the payload happens to carry.
+function describeRow(category, p) {
+  if (category === 'paint') {
+    const color = p.color === 'Other' && p.customColor ? p.customColor : p.color;
+    const tail = [color, p.finish].filter(Boolean).join(' ');
+    return [p.location, tail].filter(Boolean).join(' · ');
+  }
+  return p.item || p.name || p.type || p.location || category;
+}
+
 async function sendSummaryEmail({ address, inspection, itemRows }) {
-  const { BREVO_API_KEY, MEETING_EMAIL_TO } = process.env;
-  const missing = [];
-  if (!BREVO_API_KEY) missing.push('BREVO_API_KEY');
-  if (!MEETING_EMAIL_TO) missing.push('MEETING_EMAIL_TO');
-  if (missing.length > 0) {
-    console.warn(`[save-inspection] ✉ Skipping email — missing env var(s): ${missing.join(', ')}`);
-    return;
+  const flagged = itemRows.filter(r => r.needs_this);
+  const gather = flagged.filter(r => r.item_type === 'purchase');
+  const tasks = flagged.filter(r => r.item_type === 'work');
+  const conditionLabel = CONDITION_LABELS[inspection.overall_condition] || inspection.overall_condition || '—';
+  const isDraft = inspection.status === 'draft';
+
+  const lines = [
+    `Address: ${address}`,
+    `Inspector: ${inspection.inspector || '—'}`,
+    `Date: ${inspection.inspection_date}`,
+    `Inspection Status: ${capitalize(inspection.status)}`,
+    `Overall condition: ${conditionLabel}`,
+    '',
+    `Flagged items: ${flagged.length} (Gather: ${gather.length} · Tasks: ${tasks.length})`,
+  ];
+  if (inspection.overall_notes) {
+    lines.push('', 'Overall notes:', inspection.overall_notes);
   }
-  console.log(`[save-inspection] ✉ Sending email → ${MEETING_EMAIL_TO}`);
-
-  try {
-    const flagged = itemRows.filter(r => r.needs_this);
-    const gather = flagged.filter(r => r.item_type === 'purchase');
-    const tasks = flagged.filter(r => r.item_type === 'work');
-    const conditionLabel = CONDITION_LABELS[inspection.overall_condition] || inspection.overall_condition || '—';
-    const isDraft = inspection.status === 'draft';
-
-    const lines = [
-      `Address: ${address}`,
-      `Inspector: ${inspection.inspector || '—'}`,
-      `Date: ${inspection.inspection_date}`,
-      `Status: ${inspection.status}`,
-      `Overall condition: ${conditionLabel}`,
-      '',
-      `Flagged items: ${flagged.length} (Gather: ${gather.length} · Tasks: ${tasks.length})`,
-    ];
-    if (inspection.overall_notes) {
-      lines.push('', 'Overall notes:', inspection.overall_notes);
+  if (flagged.length > 0) {
+    lines.push('', '— Flagged —');
+    for (const r of flagged) {
+      const p = r.payload || {};
+      const desc = describeRow(r.category, p);
+      // Render condition + spec + notes side-by-side, separated by em dashes.
+      // Previous code used a fallback chain (condition || spec || notes), which
+      // silently dropped the inspector's free-text notes whenever a paint or
+      // condition row also had a condition rating set.
+      const annot = [p.condition, p.spec, p.notes].filter(Boolean).join(' — ');
+      lines.push(`  • [${r.item_type === 'purchase' ? 'Gather' : 'Task'}] ${r.category} — ${desc}${annot ? ` (${annot})` : ''}`);
     }
-    if (flagged.length > 0) {
-      lines.push('', '— Flagged —');
-      for (const r of flagged) {
-        const p = r.payload || {};
-        const desc = p.item || p.name || p.type || p.location || r.category;
-        const note = p.condition || p.spec || p.notes || '';
-        lines.push(`  • [${r.item_type === 'purchase' ? 'Gather' : 'Task'}] ${r.category} — ${desc}${note ? ` (${note})` : ''}`);
-      }
-    }
-
-    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sender: { name: 'Mills Dashboard', email: 'nathan@millsrentals.com' },
-        to: [{ email: MEETING_EMAIL_TO }],
-        subject: `Inspection ${isDraft ? 'draft ' : ''}saved: ${address} — ${conditionLabel}`,
-        textContent: lines.join('\n'),
-      }),
-    });
-    if (!res.ok) {
-      const errBody = await res.text();
-      throw new Error(`Brevo ${res.status}: ${errBody}`);
-    }
-    console.log(`[save-inspection] ✉ Summary email sent for "${address}"`);
-  } catch (err) {
-    console.error(`[save-inspection] email failed for "${address}":`, err.message);
   }
+
+  await sendStageEmail({
+    subject: `Inspection ${isDraft ? 'draft ' : ''}saved: ${address} — ${conditionLabel}`,
+    lines,
+    label: 'save-inspection',
+  });
 }

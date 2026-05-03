@@ -48,7 +48,7 @@ export async function handler(event) {
 
     const { data, error } = await supabase
       .from('inspections')
-      .select('id, unit_address, inspector, inspection_date, overall_condition, overall_notes, items_json, status, turnover_year, created_at, updated_at')
+      .select('id, unit_address, inspector, inspection_date, overall_condition, overall_notes, items_json, status, turnover_year, cleaned_at, cleaned_by, cleaned_notes, finalized_at, finalized_by, finalized_notes, tasks_complete_email_sent_at, created_at, updated_at')
       .eq('unit_address', address)
       .order('created_at', { ascending: false })
       .limit(1);
@@ -71,17 +71,24 @@ export async function handler(event) {
     if (itemsErr) throw new Error(`fetch items: ${itemsErr.message}`);
 
     const inspection = {
-      id:               row.id,
-      address:          row.unit_address || '',
-      inspector:        row.inspector || '',
-      date:             row.inspection_date || '',
-      overallCondition: row.overall_condition || '',
-      overallNotes:     row.overall_notes || '',
-      items:            row.items_json || {},
-      rows:             itemRows || [],
-      status:           row.status || 'complete',
-      turnoverYear:     row.turnover_year || null,
-      timestamp:        row.updated_at || row.created_at || '',
+      id:                  row.id,
+      address:             row.unit_address || '',
+      inspector:           row.inspector || '',
+      date:                row.inspection_date || '',
+      overallCondition:    row.overall_condition || '',
+      overallNotes:        row.overall_notes || '',
+      items:               row.items_json || {},
+      rows:                itemRows || [],
+      status:              row.status || 'complete',
+      turnoverYear:        row.turnover_year || null,
+      cleanedAt:           row.cleaned_at || null,
+      cleanedBy:           row.cleaned_by || null,
+      cleanedNotes:        row.cleaned_notes || '',
+      finalizedAt:         row.finalized_at || null,
+      finalizedBy:         row.finalized_by || null,
+      finalizedNotes:      row.finalized_notes || '',
+      tasksCompleteAt:     row.tasks_complete_email_sent_at || null,
+      timestamp:           row.updated_at || row.created_at || '',
     };
 
     console.log(`[get-inspection] OK — "${address}" | ${itemRows?.length || 0} items | ${Date.now() - t0}ms`);

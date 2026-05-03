@@ -9,6 +9,7 @@ import {
   CONDITION_GROUPS, OVERALL_CONDITIONS,
   sectionForConditionItem, CATEGORY_LABELS, summarizeRow,
 } from '../config/turnoverOptions';
+import TurnoverStageModal from './TurnoverStageModal';
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 const sectionTitleStyle = {
@@ -129,6 +130,18 @@ export default function TurnoverTab({ unit, accentColor, onOpenWorklist }) {
   const [overallCondition, setOverallCondition] = useState(null);
   const [overallNotes, setOverallNotes] = useState('');
 
+  // Lifecycle stages — populated from /api/get-inspection, mutated by /api/mark-inspection-stage.
+  const [cleanedAt, setCleanedAt] = useState(null);
+  const [cleanedBy, setCleanedBy] = useState(null);
+  const [cleanedNotes, setCleanedNotes] = useState('');
+  const [finalizedAt, setFinalizedAt] = useState(null);
+  const [finalizedBy, setFinalizedBy] = useState(null);
+  const [finalizedNotes, setFinalizedNotes] = useState('');
+
+  // Which stage modal (if any) is open. null when closed.
+  const [modalStage, setModalStage] = useState(null);
+  const [resentToast, setResentToast] = useState(false);
+
   // Load existing inspection
   useEffect(() => {
     setLoading(true);
@@ -143,6 +156,12 @@ export default function TurnoverTab({ unit, accentColor, onOpenWorklist }) {
           setInspectionDate(d.date || new Date().toISOString().split('T')[0]);
           setOverallCondition(d.overallCondition || null);
           setOverallNotes(d.overallNotes || '');
+          setCleanedAt(d.cleanedAt || null);
+          setCleanedBy(d.cleanedBy || null);
+          setCleanedNotes(d.cleanedNotes || '');
+          setFinalizedAt(d.finalizedAt || null);
+          setFinalizedBy(d.finalizedBy || null);
+          setFinalizedNotes(d.finalizedNotes || '');
           if (d.items) {
             if (d.items.blinds?.length) {
               setBlinds(d.items.blinds);
@@ -241,6 +260,34 @@ export default function TurnoverTab({ unit, accentColor, onOpenWorklist }) {
     }
   }
 
+  // Mark a turnover lifecycle stage (cleaned / finalized). Posts to
+  // /api/mark-inspection-stage and rehydrates local state from the response so
+  // the timestamp + author the server stamped match what the UI shows. Throws
+  // on failure so the modal can surface the error and stay open.
+  async function markStage(stage, notesText, { forceEmail } = {}) {
+    const res = await fetch('/api/mark-inspection-stage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: unit.address, stage, notes: notesText, by: 'Team', forceEmail }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j?.error || 'Save failed');
+    const i = j.inspection || {};
+    if (stage === 'cleaned') {
+      setCleanedAt(i.cleaned_at || null);
+      setCleanedBy(i.cleaned_by || null);
+      setCleanedNotes(i.cleaned_notes || '');
+    } else if (stage === 'finalized') {
+      setFinalizedAt(i.finalized_at || null);
+      setFinalizedBy(i.finalized_by || null);
+      setFinalizedNotes(i.finalized_notes || '');
+    }
+    if (forceEmail && j.emailed) {
+      setResentToast(true);
+      setTimeout(() => setResentToast(false), 2400);
+    }
+  }
+
   if (loading) {
     return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading inspection data...</div>;
   }
@@ -249,43 +296,92 @@ export default function TurnoverTab({ unit, accentColor, onOpenWorklist }) {
 
   return (
     <div>
-      {/* Header with view toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      {/* Header with view toggle + lifecycle stage buttons */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 8 }}>
         <h3 style={{ margin: 0, fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           Turnover {isEdit && <span style={{ color: accentColor, marginLeft: 6 }}>· Editing</span>}
         </h3>
-        <button
-          onClick={() => setView(isEdit ? 'overview' : 'edit')}
-          title={isEdit ? 'Done editing' : 'Edit'}
-          style={{
-            background: isEdit ? accentColor : 'transparent',
-            border: `1px solid ${isEdit ? accentColor : 'var(--border-default)'}`,
-            borderRadius: 'var(--radius-sm)',
-            padding: '5px 10px', cursor: 'pointer',
-            color: isEdit ? '#000' : 'var(--text-muted)',
-            fontSize: 11, fontWeight: 600,
-            display: 'flex', alignItems: 'center', gap: 5,
-            transition: 'all var(--duration-fast) ease',
-          }}
-        >
-          {isEdit ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {!isEdit && (
             <>
-              <svg style={{ width: 11, height: 11 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Done
-            </>
-          ) : (
-            <>
-              <svg style={{ width: 11, height: 11 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                <path d="m15 5 4 4" />
-              </svg>
-              Edit
+              <StageButton
+                stage="cleaned"
+                label="Cleaned"
+                doneAt={cleanedAt}
+                disabled={!inspectionId}
+                accentColor={accentColor}
+                onClick={() => setModalStage('cleaned')}
+              />
+              <StageButton
+                stage="finalized"
+                label="Finalized"
+                doneAt={finalizedAt}
+                disabled={!inspectionId}
+                accentColor={accentColor}
+                onClick={() => setModalStage('finalized')}
+              />
             </>
           )}
-        </button>
+          <button
+            onClick={() => setView(isEdit ? 'overview' : 'edit')}
+            title={isEdit ? 'Done editing' : 'Edit'}
+            style={{
+              background: isEdit ? accentColor : 'transparent',
+              border: `1px solid ${isEdit ? accentColor : 'var(--border-default)'}`,
+              borderRadius: 'var(--radius-sm)',
+              padding: '5px 10px', cursor: 'pointer',
+              color: isEdit ? '#000' : 'var(--text-muted)',
+              fontSize: 11, fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 5,
+              transition: 'all var(--duration-fast) ease',
+            }}
+          >
+            {isEdit ? (
+              <>
+                <svg style={{ width: 11, height: 11 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Done
+              </>
+            ) : (
+              <>
+                <svg style={{ width: 11, height: 11 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                  <path d="m15 5 4 4" />
+                </svg>
+                Edit
+              </>
+            )}
+          </button>
+        </div>
       </div>
+
+      {resentToast && (
+        <div style={{
+          marginBottom: 12,
+          padding: '6px 10px',
+          background: 'var(--bg-elevated)',
+          border: '1px solid var(--border-default)',
+          borderRadius: 'var(--radius-sm)',
+          fontSize: 12, color: 'var(--text-muted)',
+        }}>
+          ✓ Email resent to team.
+        </div>
+      )}
+
+      {modalStage && (
+        <TurnoverStageModal
+          stage={modalStage}
+          initialNotes={modalStage === 'cleaned' ? cleanedNotes : finalizedNotes}
+          alreadySet={!!(modalStage === 'cleaned' ? cleanedAt : finalizedAt)}
+          warningText={modalStage === 'finalized' && !cleanedAt
+            ? "Cleaned hasn't been recorded yet — finalize anyway?"
+            : null}
+          accentColor={accentColor}
+          onSave={(notesText, { forceEmail }) => markStage(modalStage, notesText, { forceEmail })}
+          onClose={() => setModalStage(null)}
+        />
+      )}
 
       {isEdit ? (
         <TurnoverEdit
@@ -317,6 +413,8 @@ export default function TurnoverTab({ unit, accentColor, onOpenWorklist }) {
           inspectionDate={inspectionDate}
           inspector={inspectorName}
           overallCondition={overallCondition}
+          cleanedAt={cleanedAt} cleanedBy={cleanedBy} cleanedNotes={cleanedNotes}
+          finalizedAt={finalizedAt} finalizedBy={finalizedBy} finalizedNotes={finalizedNotes}
           onToggle={toggleRowField}
           onEditClick={() => setView('edit')}
           onOpenWorklist={onOpenWorklist ? () => onOpenWorklist(unit.address) : null}
@@ -328,7 +426,12 @@ export default function TurnoverTab({ unit, accentColor, onOpenWorklist }) {
 
 // ─── Overview (read-only Gather + Tasks) ─────────────────────────────────────
 
-function TurnoverOverview({ rows, inspectionId, inspectionDate, inspector, overallCondition, onToggle, onEditClick, onOpenWorklist }) {
+function TurnoverOverview({
+  rows, inspectionId, inspectionDate, inspector, overallCondition,
+  cleanedAt, cleanedBy, cleanedNotes,
+  finalizedAt, finalizedBy, finalizedNotes,
+  onToggle, onEditClick, onOpenWorklist,
+}) {
   if (!inspectionId) {
     return (
       <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, fontStyle: 'italic' }}>
@@ -383,6 +486,13 @@ function TurnoverOverview({ rows, inspectionId, inspectionDate, inspector, overa
           </span>
         )}
       </div>
+
+      {(cleanedAt || finalizedAt) && (
+        <div style={{ marginBottom: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {cleanedAt && <StageStatusCard label="Cleaned" at={cleanedAt} by={cleanedBy} notes={cleanedNotes} />}
+          {finalizedAt && <StageStatusCard label="Finalized" at={finalizedAt} by={finalizedBy} notes={finalizedNotes} />}
+        </div>
+      )}
 
       {/* Gather */}
       <div style={sectionTitleStyle}>Gather — to bring on-site</div>
@@ -879,4 +989,81 @@ function NeedToggle({ value, onChange }) {
 
 function updateList(setter, index, key, value) {
   setter(prev => prev.map((item, i) => i === index ? { ...item, [key]: value } : item));
+}
+
+// ─── Stage button + status card (Cleaned / Finalized) ───────────────────────
+
+// Compact relative-time label tuned for turnover timelines: "just now",
+// "2h ago", "3d ago". Matches the tone of the existing tile age label.
+function timeAgo(iso) {
+  if (!iso) return '';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms) || ms < 0) return '';
+  const min = Math.round(ms / 60000);
+  if (min < 1)   return 'just now';
+  if (min < 60)  return `${min}m ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 24)   return `${hr}h ago`;
+  const d = Math.round(hr / 24);
+  if (d < 30)    return `${d}d ago`;
+  const mo = Math.round(d / 30);
+  return `${mo}mo ago`;
+}
+
+function StageButton({ stage, label, doneAt, disabled, accentColor, onClick }) {
+  const done = !!doneAt;
+  const tooltip = disabled
+    ? 'Save an inspection first'
+    : done
+      ? `${label} ${timeAgo(doneAt)} — click to update notes`
+      : `Mark this property ${label.toLowerCase()}`;
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={tooltip}
+      style={{
+        ...toggleBaseStyle,
+        background: done ? accentColor : 'transparent',
+        border: `1px solid ${done ? accentColor : 'var(--border-default)'}`,
+        color: done ? '#000' : 'var(--text-muted)',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      {done ? `✓ ${label}` : label}
+      {done && <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.85 }}>· {timeAgo(doneAt)}</span>}
+    </button>
+  );
+}
+
+function StageStatusCard({ label, at, by, notes }) {
+  const tsLabel = at ? new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  return (
+    <div style={{
+      ...itemBlockStyle,
+      padding: '10px 12px',
+      marginBottom: 0,
+    }}>
+      <div style={{
+        fontSize: 11, fontWeight: 700, color: 'var(--text-muted)',
+        textTransform: 'uppercase', letterSpacing: '0.06em',
+        display: 'flex', gap: 8, alignItems: 'baseline',
+      }}>
+        <span>✓ {label}</span>
+        <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0, color: 'var(--text-dim)' }}>
+          {timeAgo(at)}{by ? ` · by ${by}` : ''} · {tsLabel}
+        </span>
+      </div>
+      {notes && notes.trim() && (
+        <div style={{
+          marginTop: 6,
+          fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic',
+          whiteSpace: 'pre-wrap',
+        }}>
+          “{notes.trim()}”
+        </div>
+      )}
+    </div>
+  );
 }
