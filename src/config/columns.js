@@ -83,6 +83,8 @@ export const HEADER_TO_FIELD = {
   // Paint
   'Paint Interior':             'paint_interior',
   'Paint Trim':                 'paint_trim',
+  'Paint Exterior':             'paint_exterior',
+  'Paint Trim Exterior':        'paint_trim_exterior',
   'Paint Brand':                'paint_brand',
   'Paint Last Done':            'paint_last_done',
 
@@ -166,6 +168,8 @@ export const FIELD_TO_HEADER = {
   // Paint
   'paint_interior':             'Paint Interior',
   'paint_trim':                 'Paint Trim',
+  'paint_exterior':             'Paint Exterior',
+  'paint_trim_exterior':        'Paint Trim Exterior',
   'paint_brand':                'Paint Brand',
   'paint_last_done':            'Paint Last Done',
 

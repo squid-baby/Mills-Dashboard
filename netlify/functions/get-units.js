@@ -41,7 +41,7 @@ export async function handler() {
         water_shutoff, filter_size, filter_size_2, internet_provider,
         toilet_flapper_style, toilet_seat_style,
         outlet_standard_color,
-        paint_interior, paint_trim, paint_brand, paint_last_done,
+        paint_interior, paint_trim, paint_exterior, paint_trim_exterior, paint_brand, paint_last_done,
         unit_notes, portfolio, lead_paint,
         residents ( name, email, phone, status, lease_end, move_out_date, lease_signed, deposit_paid, notes ),
         next_residents ( name, email, phone, move_in_date )
@@ -170,10 +170,12 @@ function buildUnit(row, id) {
       // Standards
       outlet_standard_color: row.outlet_standard_color || '',
       // Paint
-      paint_interior:   row.paint_interior || '',
-      paint_trim:       row.paint_trim || '',
-      paint_brand:      row.paint_brand || '',
-      paint_last_done:  row.paint_last_done || '',
+      paint_interior:      row.paint_interior || '',
+      paint_trim:          row.paint_trim || '',
+      paint_exterior:      row.paint_exterior || '',
+      paint_trim_exterior: row.paint_trim_exterior || '',
+      paint_brand:         row.paint_brand || '',
+      paint_last_done:     row.paint_last_done || '',
       // Misc
       unit_notes:  row.unit_notes || '',
       portfolio:   row.portfolio || '',
