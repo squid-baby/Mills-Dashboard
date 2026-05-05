@@ -107,10 +107,12 @@ export const PROPERTY_INFO_FIELDS = [
     pinned: false,
     source: 'gsheet',
     fields: [
-      { key: 'paint_interior',  label: 'Interior color', source: 'gsheet' },
-      { key: 'paint_trim',      label: 'Trim color',     source: 'gsheet' },
-      { key: 'paint_brand',     label: 'Paint brand',    source: 'gsheet' },
-      { key: 'paint_last_done', label: 'Last painted',   source: 'gsheet', type: 'date' },
+      { key: 'paint_interior',      label: 'Interior color',      source: 'gsheet' },
+      { key: 'paint_trim',          label: 'Trim color',          source: 'gsheet' },
+      { key: 'paint_exterior',      label: 'Exterior color',      source: 'gsheet' },
+      { key: 'paint_trim_exterior', label: 'Exterior trim color', source: 'gsheet' },
+      { key: 'paint_brand',         label: 'Paint brand',         source: 'gsheet' },
+      { key: 'paint_last_done',     label: 'Last painted',        source: 'gsheet', type: 'date' },
     ],
   },
 ];
