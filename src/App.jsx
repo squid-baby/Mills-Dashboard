@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import { GC, PRIO, SORT_OPTS, SEED_UNITS, parseDate, fmtMonth, daysUntil } from './data/units';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { GC, getGC, PRIO, SORT_OPTS, SEED_UNITS, parseDate, fmtMonth, daysUntil } from './data/units';
 import StatusBadge from './components/StatusBadge';
 import Tile from './components/Tile';
 import DetailPanel from './components/DetailPanel';
@@ -147,6 +147,156 @@ async function exportTurnoverData(units, inspectionConditions) {
   URL.revokeObjectURL(url);
 }
 
+function MultiSelectStatus({ value, onChange, theme }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const palette = getGC(theme);
+  const keys = Object.keys(palette);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const toggle = (k) => {
+    const next = new Set(value);
+    if (next.has(k)) next.delete(k); else next.add(k);
+    onChange(next);
+  };
+
+  const allSelected = value.size === keys.length && keys.length > 0;
+  const anySelected = value.size > 0;
+
+  let label;
+  if (value.size === 0) {
+    label = 'All Statuses';
+  } else if (value.size === 1) {
+    const k = [...value][0];
+    const g = palette[k];
+    label = g ? `${g.icon} ${g.label}` : k;
+  } else {
+    label = `${value.size} statuses`;
+  }
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          background: 'var(--bg-elevated)',
+          color: anySelected ? 'var(--text-primary)' : 'var(--text-muted)',
+          border: '1px solid var(--border-default)',
+          borderRadius: 'var(--radius-sm)',
+          padding: '5px 10px',
+          fontSize: 12, fontWeight: 500,
+          cursor: 'pointer',
+          outline: 'none',
+        }}
+      >
+        <span>{label}</span>
+        {value.size > 1 && (
+          <span style={{
+            background: 'var(--text-primary)',
+            color: 'var(--bg-root)',
+            borderRadius: 999,
+            fontSize: 10, fontWeight: 700,
+            padding: '1px 6px',
+            lineHeight: 1.4,
+          }}>
+            {value.size}
+          </span>
+        )}
+        <span style={{ fontSize: 10, opacity: 0.7 }}>▾</span>
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            minWidth: 240,
+            maxHeight: 320,
+            overflowY: 'auto',
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-default)',
+            borderRadius: 'var(--radius-md)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            zIndex: 50,
+            padding: 4,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => onChange(anySelected ? new Set() : new Set(keys))}
+            style={{
+              width: '100%',
+              textAlign: 'left',
+              background: 'transparent',
+              color: 'var(--text-secondary)',
+              border: 'none',
+              borderBottom: '1px solid var(--border-subtle)',
+              padding: '8px 10px',
+              fontSize: 11, fontWeight: 600,
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+            }}
+          >
+            {anySelected ? 'Clear' : 'Select all'}
+          </button>
+          {keys.map(k => {
+            const g = palette[k];
+            const checked = value.has(k);
+            return (
+              <div
+                key={k}
+                role="option"
+                aria-selected={checked}
+                onClick={() => toggle(k)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  minHeight: 40,
+                  padding: '0 10px',
+                  cursor: 'pointer',
+                  borderRadius: 'var(--radius-sm)',
+                  background: checked ? 'var(--bg-hover, rgba(255,255,255,0.04))' : 'transparent',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover, rgba(255,255,255,0.06))'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = checked ? 'var(--bg-hover, rgba(255,255,255,0.04))' : 'transparent'; }}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  readOnly
+                  tabIndex={-1}
+                  style={{ cursor: 'pointer', pointerEvents: 'none' }}
+                />
+                <span style={{ fontSize: 14 }}>{g.icon}</span>
+                <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{g.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [theme, setTheme] = useState(
     () => document.documentElement.getAttribute('data-theme') || 'dark'
@@ -168,7 +318,7 @@ export default function App() {
   const [fetchError, setFetchError] = useState(null);
 
   const [sortBy, setSortBy] = useState('date');
-  const [filterGroup, setFilterGroup] = useState(null);
+  const [filterGroup, setFilterGroup] = useState(() => new Set());
   const [filterArea, setFilterArea] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [searchText, setSearchText] = useState('');
@@ -251,7 +401,7 @@ export default function App() {
   // Filter
   const filtered = useMemo(() => {
     let list = enriched;
-    if (filterGroup) list = list.filter(u => u.group === filterGroup);
+    if (filterGroup.size) list = list.filter(u => filterGroup.has(u.group));
     if (filterArea) list = list.filter(u => u.area === filterArea);
     if (searchText) {
       const q = searchText.toLowerCase();
@@ -304,7 +454,7 @@ export default function App() {
   // Time since last sync
   const syncAgo = formatSyncAgo(lastSynced);
 
-  const hasFilters = filterGroup || filterArea || searchText;
+  const hasFilters = filterGroup.size || filterArea || searchText;
 
   const themeButton = (
     <button
@@ -606,25 +756,7 @@ export default function App() {
 
           <div style={{ width: 1, height: 24, background: 'var(--border-subtle)', margin: '0 4px' }} />
 
-          <select
-            value={filterGroup || ''}
-            onChange={e => setFilterGroup(e.target.value || null)}
-            style={{
-              background: 'var(--bg-elevated)',
-              color: filterGroup ? 'var(--text-primary)' : 'var(--text-muted)',
-              border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-sm)',
-              padding: '5px 10px',
-              fontSize: 12, fontWeight: 500,
-              cursor: 'pointer',
-              outline: 'none',
-            }}
-          >
-            <option value="">All Statuses</option>
-            {Object.keys(GC).map(k => (
-              <option key={k} value={k}>{GC[k].icon} {GC[k].label}</option>
-            ))}
-          </select>
+          <MultiSelectStatus value={filterGroup} onChange={setFilterGroup} theme={theme} />
 
           <select
             value={filterArea || ''}
@@ -646,7 +778,7 @@ export default function App() {
 
           {hasFilters && (
             <button
-              onClick={() => { setFilterGroup(null); setFilterArea(null); setSearchText(''); }}
+              onClick={() => { setFilterGroup(new Set()); setFilterArea(null); setSearchText(''); }}
               style={{
                 background: 'rgba(239, 68, 68, 0.12)',
                 color: '#f87171',
