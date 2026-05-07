@@ -136,7 +136,7 @@ log(`Fetched ${units.length} unit addresses`);
 // Step 3: Claude — identify which properties were discussed
 log('Calling Claude to identify mentioned properties...');
 const matchMsg = await anthropic.messages.create({
-  model: 'claude-opus-4-6',
+  model: 'claude-sonnet-4-6',
   max_tokens: 1024,
   messages: [{
     role: 'user',
@@ -191,8 +191,8 @@ for (const address of (matchResult.matched ?? [])) {
 // Step 5: Claude — write the email body
 log('Calling Claude to write email body...');
 const emailMsg = await anthropic.messages.create({
-  model: 'claude-opus-4-6',
-  max_tokens: 6000,
+  model: 'claude-sonnet-4-6',
+  max_tokens: 8192,
   messages: [{
     role: 'user',
     content: `You are a property management assistant writing meeting notes for the Mills Rentals team.
@@ -258,6 +258,9 @@ ${transcript}`,
   }],
 });
 
+if (emailMsg.stop_reason === 'max_tokens') {
+  log('WARN: Email body hit max_tokens limit — output was truncated. Consider raising max_tokens.');
+}
 const emailBody = emailMsg.content[0].text.trim();
 log('Email body generated');
 
