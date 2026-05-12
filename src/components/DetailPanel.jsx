@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getGC, getAlerts, parseDate, daysUntil } from '../data/units';
+import { getGC, getAlerts, parseDate, daysUntil, effectiveLeaseEnd, isLeaseEndInferred } from '../data/units';
 import StatusBadge from './StatusBadge';
 import PropertyInfoTab from './PropertyInfoTab';
 import TurnoverTab from './TurnoverTab';
@@ -56,9 +56,13 @@ export default function DetailPanel({ unit, onClose, theme = 'dark', onOpenWorkl
     else turnWindowColor = '#34d399';
   }
 
+  const leaseEndDisplay = isLeaseEndInferred(unit)
+    ? `${effectiveLeaseEnd(unit)} (est.)`
+    : unit.leaseEnd;
+
   const factPairs = [
     ['Bedrooms', unit.beds + ' BR'],
-    ['Lease End', unit.leaseEnd],
+    ['Lease End', leaseEndDisplay],
     ['Owner', unit.owner],
     ['Area', unit.area],
     ['Lease Signed', unit.allSigned ? 'Yes' : 'No'],

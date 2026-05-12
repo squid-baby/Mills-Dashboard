@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { GC, getGC, PRIO, SORT_OPTS, SEED_UNITS, parseDate, fmtMonth, daysUntil } from './data/units';
+import { GC, getGC, PRIO, SORT_OPTS, SEED_UNITS, parseDate, fmtMonth, daysUntil, effectiveLeaseEnd } from './data/units';
 import StatusBadge from './components/StatusBadge';
 import Tile from './components/Tile';
 import DetailPanel from './components/DetailPanel';
@@ -418,7 +418,7 @@ export default function App() {
   const grouped = useMemo(() => {
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === 'date') {
-        const dateDiff = parseDate(a.leaseEnd) - parseDate(b.leaseEnd);
+        const dateDiff = parseDate(effectiveLeaseEnd(a)) - parseDate(effectiveLeaseEnd(b));
         if (dateDiff !== 0) return dateDiff;
         return PRIO.indexOf(a.group) - PRIO.indexOf(b.group);
       }
@@ -432,7 +432,7 @@ export default function App() {
     const groups = {};
     sorted.forEach(u => {
       let key;
-      if (sortBy === 'date') key = fmtMonth(u.leaseEnd);
+      if (sortBy === 'date') key = fmtMonth(effectiveLeaseEnd(u));
       else if (sortBy === 'area') key = u.area || 'Unknown';
       else if (sortBy === 'owner') key = u.owner || 'Unknown';
       else if (sortBy === 'status') key = GC[u.group]?.label || u.group;
