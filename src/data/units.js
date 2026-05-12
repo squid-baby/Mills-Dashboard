@@ -61,6 +61,31 @@ export function daysUntil(d) {
   return Math.ceil((parseDate(d) - new Date()) / 864e5);
 }
 
+// ─── Effective lease end (handles renewed-but-stale-date case) ──────────────
+// When a unit is fully renewed (group='renewed' implies every renewing resident
+// signed; we additionally require all deposits paid) AND the stored lease end
+// is in the past, the Neo sheet's "Lease End" cell hasn't been bumped yet.
+// Infer effective lease end as stored date + 12 months so sort/group land in
+// the next renewal cycle. Display sites add a visual marker so the team still
+// knows to update the source.
+export function effectiveLeaseEnd(unit) {
+  if (!unit?.leaseEnd) return unit?.leaseEnd || '';
+  if (unit.group !== 'renewed') return unit.leaseEnd;
+  if (!unit.allDeposit) return unit.leaseEnd;
+  const parsed = parseDate(unit.leaseEnd);
+  if (parsed >= new Date()) return unit.leaseEnd;
+  const bumped = new Date(parsed);
+  bumped.setFullYear(bumped.getFullYear() + 1);
+  const m = bumped.getMonth() + 1;
+  const d = bumped.getDate();
+  const y = String(bumped.getFullYear()).slice(-2);
+  return `${m}/${d}/${y}`;
+}
+
+export function isLeaseEndInferred(unit) {
+  return !!unit?.leaseEnd && effectiveLeaseEnd(unit) !== unit.leaseEnd;
+}
+
 // ─── Alert / flagging logic ──────────────────────────────────────────────────
 export function getAlerts(unit) {
   const alerts = [];

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getGC, getAlerts } from '../data/units';
+import { getGC, getAlerts, effectiveLeaseEnd, isLeaseEndInferred } from '../data/units';
 
 function formatInspectionAge(isoDate) {
   if (!isoDate) return '';
@@ -150,8 +150,17 @@ export default function Tile({ unit, onClick, index = 0, theme = 'dark' }) {
               {unit.beds} BR
             </span>
             <span style={{ color: 'var(--text-dim)' }}>/</span>
-            <span className="mono" style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>
-              {unit.leaseEnd}
+            <span
+              className="mono"
+              title={isLeaseEndInferred(unit) ? 'Estimated — renewal signed but lease-end date not yet updated in Neo sheet' : undefined}
+              style={{
+                fontSize: 11,
+                fontVariantNumeric: 'tabular-nums',
+                fontStyle: isLeaseEndInferred(unit) ? 'italic' : 'normal',
+                opacity: isLeaseEndInferred(unit) ? 0.85 : 1,
+              }}
+            >
+              {effectiveLeaseEnd(unit)}
             </span>
             {unit.area && (
               <>
