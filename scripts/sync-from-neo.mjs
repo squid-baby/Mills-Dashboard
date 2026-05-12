@@ -234,19 +234,20 @@ function buildResidentRows(idMap) {
     const seen = new Set();
     for (const row of rows) {
       const name = clean(row[tenantIdx.residentName]);
-      if (!name) continue;
-      residentRows.push({
-        unit_id: unitId,
-        name,
-        email: clean(row[tenantIdx.residentEmail]),
-        phone: clean(row[tenantIdx.residentPhone]),
-        status: clean(row[tenantIdx.status]).toLowerCase() || 'unknown',
-        lease_end: parseDate(row[tenantIdx.leaseEnd]),
-        move_out_date: parseDate(row[tenantIdx.moveOut]),
-        lease_signed: yn(row[tenantIdx.leaseSigned]),
-        deposit_paid: yn(row[tenantIdx.depositPaid]),
-        notes: clean(row[tenantIdx.notes]),
-      });
+      if (name) {
+        residentRows.push({
+          unit_id: unitId,
+          name,
+          email: clean(row[tenantIdx.residentEmail]),
+          phone: clean(row[tenantIdx.residentPhone]),
+          status: clean(row[tenantIdx.status]).toLowerCase() || 'unknown',
+          lease_end: parseDate(row[tenantIdx.leaseEnd]),
+          move_out_date: parseDate(row[tenantIdx.moveOut]),
+          lease_signed: yn(row[tenantIdx.leaseSigned]),
+          deposit_paid: yn(row[tenantIdx.depositPaid]),
+          notes: clean(row[tenantIdx.notes]),
+        });
+      }
       const nextName = clean(row[tenantIdx.nextResident]);
       const nextEmail = clean(row[tenantIdx.nextEmail]);
       if (nextName) {
