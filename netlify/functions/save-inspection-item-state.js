@@ -99,12 +99,19 @@ export async function handler(event) {
 }
 
 // Read the just-toggled row's parent inspection, count remaining flagged-but-
-// not-done items, and send the "Turnover Task Status: Complete" email exactly
-// once per completion cycle. Idempotency: the email only fires when
-// inspections.tasks_complete_email_sent_at is null; we set it to now() right
-// before sending so concurrent toggles don't double-fire. Any failure here
-// is logged and swallowed by the caller — the row-state mutation already
-// succeeded.
+// not-done WORK items, and send the "Turnover Task Status: Complete" email
+// exactly once per completion cycle.
+//
+// "Tasks done" means item_type='work' — the on-site labor (paint, repair,
+// condition-driven work, etc.). Gather/purchase items are shopping that
+// doesn't gate "ready for cleaning"; a cleaner can clean before the new
+// bulbs arrive. Counting only work rows matches Amanda's mental model and
+// the email subject line.
+//
+// Idempotency: the email only fires when inspections.tasks_complete_email_sent_at
+// is null; we set it to now() right before sending so concurrent toggles
+// don't double-fire. Any failure here is logged and swallowed by the caller
+// — the row-state mutation already succeeded.
 async function maybeSendAllTasksComplete(supabase, rowId) {
   const { data: row, error: rowErr } = await supabase
     .from('inspection_items')
@@ -113,14 +120,26 @@ async function maybeSendAllTasksComplete(supabase, rowId) {
     .single();
   if (rowErr || !row?.inspection_id) return;
 
-  const { count: pending, error: countErr } = await supabase
+  const { count: pendingWork, error: countErr } = await supabase
     .from('inspection_items')
     .select('id', { count: 'exact', head: true })
     .eq('inspection_id', row.inspection_id)
     .eq('needs_this', true)
+    .eq('item_type', 'work')
     .is('done_at', null);
-  if (countErr) throw new Error(`count pending: ${countErr.message}`);
-  if (pending !== 0) return;
+  if (countErr) throw new Error(`count pending work: ${countErr.message}`);
+  if (pendingWork !== 0) return;
+
+  // If no work was ever flagged on this inspection, "ready for cleaning"
+  // doesn't make sense — bail out so a gather-only inspection never
+  // accidentally fires this email when a single shopping item gets checked.
+  const { count: totalWork } = await supabase
+    .from('inspection_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('inspection_id', row.inspection_id)
+    .eq('needs_this', true)
+    .eq('item_type', 'work');
+  if (!totalWork) return;
 
   const { data: insp, error: inspErr } = await supabase
     .from('inspections')
@@ -146,25 +165,31 @@ async function maybeSendAllTasksComplete(supabase, rowId) {
   }
   if (!marked || marked.length === 0) return; // lost the race — another request already emailed
 
-  const { count: doneCount } = await supabase
+  const { count: pendingGather } = await supabase
     .from('inspection_items')
     .select('id', { count: 'exact', head: true })
     .eq('inspection_id', insp.id)
-    .eq('needs_this', true);
+    .eq('needs_this', true)
+    .eq('item_type', 'purchase')
+    .is('done_at', null);
 
   const address = insp.unit_address || row.unit_address || '(unknown)';
   const tsLabel = new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' }) + ' ET';
+  const gatherLine = pendingGather && pendingGather > 0
+    ? `Shopping still pending: ${pendingGather} item${pendingGather === 1 ? '' : 's'} (Gather list).`
+    : 'Shopping list also complete.';
 
   await sendStageEmail({
-    subject: `Turnover tasks complete: ${address}`,
+    subject: `Turnover work complete — ready for cleaning: ${address}`,
     label: 'tasks-complete',
     lines: [
       address,
       '',
       'Turnover Task Status: Complete',
       '',
-      'All flagged turnover tasks are now done.',
-      `Tasks: ${doneCount ?? '—'} completed`,
+      'Turnover work is done — property is ready for cleaning.',
+      `Tasks completed: ${totalWork}`,
+      gatherLine,
       `Last action: ${tsLabel}${row.done_by ? ` by ${row.done_by}` : ''}`,
     ],
   });
