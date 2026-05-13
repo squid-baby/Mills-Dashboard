@@ -77,10 +77,16 @@ export async function handler(event) {
     // idempotency guard — un-checking and re-checking the last box won't spam.
     // save-inspection.js clears the marker when new flagged work appears, so
     // future legitimate "all done" transitions can re-trigger.
+    // Important: awaited, not fire-and-forget. On Netlify (AWS Lambda under
+    // the hood) the container can freeze the moment the handler returns, so
+    // a dangling Promise might never complete its Brevo POST. The extra
+    // 200-500ms of latency is worth a reliable email.
     if (field === 'done_at' && value) {
-      maybeSendAllTasksComplete(supabase, id).catch(err => {
+      try {
+        await maybeSendAllTasksComplete(supabase, id);
+      } catch (err) {
         console.error('[save-inspection-item-state] all-tasks-complete check failed:', err.message);
-      });
+      }
     }
 
     return {
