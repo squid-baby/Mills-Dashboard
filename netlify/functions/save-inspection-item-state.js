@@ -105,14 +105,14 @@ export async function handler(event) {
 }
 
 // Read the just-toggled row's parent inspection, count remaining flagged-but-
-// not-done WORK items, and send the "Turnover Task Status: Complete" email
-// exactly once per completion cycle.
+// not-done items (both Gather and Tasks), and send the "Turnover Task Status:
+// Complete — ready for cleaning" email exactly once per completion cycle.
 //
-// "Tasks done" means item_type='work' — the on-site labor (paint, repair,
-// condition-driven work, etc.). Gather/purchase items are shopping that
-// doesn't gate "ready for cleaning"; a cleaner can clean before the new
-// bulbs arrive. Counting only work rows matches Amanda's mental model and
-// the email subject line.
+// Trigger condition: every needs_this row has done_at set. This includes both
+// item_type='work' (on-site labor) AND item_type='purchase' (shopping). The
+// "ready for cleaning" milestone here means the property is fully buttoned-up
+// — work done, shopping in hand — so the cleaner doesn't show up to a
+// half-finished turnover.
 //
 // Idempotency: the email only fires when inspections.tasks_complete_email_sent_at
 // is null; we set it to now() right before sending so concurrent toggles
@@ -126,26 +126,24 @@ async function maybeSendAllTasksComplete(supabase, rowId) {
     .single();
   if (rowErr || !row?.inspection_id) return;
 
-  const { count: pendingWork, error: countErr } = await supabase
+  const { count: pending, error: countErr } = await supabase
     .from('inspection_items')
     .select('id', { count: 'exact', head: true })
     .eq('inspection_id', row.inspection_id)
     .eq('needs_this', true)
-    .eq('item_type', 'work')
     .is('done_at', null);
-  if (countErr) throw new Error(`count pending work: ${countErr.message}`);
-  if (pendingWork !== 0) return;
+  if (countErr) throw new Error(`count pending: ${countErr.message}`);
+  if (pending !== 0) return;
 
-  // If no work was ever flagged on this inspection, "ready for cleaning"
-  // doesn't make sense — bail out so a gather-only inspection never
-  // accidentally fires this email when a single shopping item gets checked.
-  const { count: totalWork } = await supabase
+  // Guard against firing on an inspection that flagged nothing (a gather/task
+  // count of 0 would otherwise satisfy "pending === 0" the moment any done_at
+  // gets toggled in some unrelated edge case).
+  const { count: totalFlagged } = await supabase
     .from('inspection_items')
     .select('id', { count: 'exact', head: true })
     .eq('inspection_id', row.inspection_id)
-    .eq('needs_this', true)
-    .eq('item_type', 'work');
-  if (!totalWork) return;
+    .eq('needs_this', true);
+  if (!totalFlagged) return;
 
   const { data: insp, error: inspErr } = await supabase
     .from('inspections')
@@ -171,31 +169,35 @@ async function maybeSendAllTasksComplete(supabase, rowId) {
   }
   if (!marked || marked.length === 0) return; // lost the race — another request already emailed
 
-  const { count: pendingGather } = await supabase
+  // Break the count out by type so the email body shows both lines without
+  // a second round-trip.
+  const { count: workCount } = await supabase
     .from('inspection_items')
     .select('id', { count: 'exact', head: true })
     .eq('inspection_id', insp.id)
     .eq('needs_this', true)
-    .eq('item_type', 'purchase')
-    .is('done_at', null);
+    .eq('item_type', 'work');
+  const { count: gatherCount } = await supabase
+    .from('inspection_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('inspection_id', insp.id)
+    .eq('needs_this', true)
+    .eq('item_type', 'purchase');
 
   const address = insp.unit_address || row.unit_address || '(unknown)';
   const tsLabel = new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' }) + ' ET';
-  const gatherLine = pendingGather && pendingGather > 0
-    ? `Shopping still pending: ${pendingGather} item${pendingGather === 1 ? '' : 's'} (Gather list).`
-    : 'Shopping list also complete.';
 
   await sendStageEmail({
-    subject: `Turnover work complete — ready for cleaning: ${address}`,
+    subject: `Turnover complete — ready for cleaning: ${address}`,
     label: 'tasks-complete',
     lines: [
       address,
       '',
       'Turnover Task Status: Complete',
       '',
-      'Turnover work is done — property is ready for cleaning.',
-      `Tasks completed: ${totalWork}`,
-      gatherLine,
+      'All flagged turnover items are done — property is ready for cleaning.',
+      `Tasks completed: ${workCount ?? '—'}`,
+      `Gather completed: ${gatherCount ?? '—'}`,
       `Last action: ${tsLabel}${row.done_by ? ` by ${row.done_by}` : ''}`,
     ],
   });
