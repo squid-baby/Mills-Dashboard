@@ -413,6 +413,7 @@ export default function TurnoverTab({ unit, accentColor, onOpenWorklist }) {
           inspectionDate={inspectionDate}
           inspector={inspectorName}
           overallCondition={overallCondition}
+          overallNotes={overallNotes}
           cleanedAt={cleanedAt} cleanedBy={cleanedBy} cleanedNotes={cleanedNotes}
           finalizedAt={finalizedAt} finalizedBy={finalizedBy} finalizedNotes={finalizedNotes}
           onToggle={toggleRowField}
@@ -427,7 +428,7 @@ export default function TurnoverTab({ unit, accentColor, onOpenWorklist }) {
 // ─── Overview (read-only Gather + Tasks) ─────────────────────────────────────
 
 function TurnoverOverview({
-  rows, inspectionId, inspectionDate, inspector, overallCondition,
+  rows, inspectionId, inspectionDate, inspector, overallCondition, overallNotes,
   cleanedAt, cleanedBy, cleanedNotes,
   finalizedAt, finalizedBy, finalizedNotes,
   onToggle, onEditClick, onOpenWorklist,
@@ -491,6 +492,30 @@ function TurnoverOverview({
         <div style={{ marginBottom: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {cleanedAt && <StageStatusCard label="Cleaned" at={cleanedAt} by={cleanedBy} notes={cleanedNotes} />}
           {finalizedAt && <StageStatusCard label="Finalized" at={finalizedAt} by={finalizedBy} notes={finalizedNotes} />}
+        </div>
+      )}
+
+      {overallNotes && overallNotes.trim() && (
+        <div style={{
+          ...itemBlockStyle,
+          marginBottom: 18,
+          background: 'var(--bg-surface)',
+          borderLeft: '3px solid var(--text-muted)',
+        }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700, color: 'var(--text-muted)',
+            textTransform: 'uppercase', letterSpacing: '0.06em',
+            marginBottom: 6,
+          }}>
+            Inspector's overall notes
+          </div>
+          <div style={{
+            fontSize: 13, color: 'var(--text-primary)',
+            whiteSpace: 'pre-wrap',
+            lineHeight: 1.45,
+          }}>
+            {overallNotes.trim()}
+          </div>
         </div>
       )}
 
