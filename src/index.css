@@ -147,3 +147,28 @@ input, select, button, textarea {
 .mono {
   font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
 }
+
+/* Mobile header: stack brand row above controls row so the search bar
+   doesn't crowd out the title. !important is needed only to override
+   the inline styles on the header containers — used surgically per
+   property, not as a blanket rule. */
+@media (max-width: 640px) {
+  .dashboard-header-row {
+    flex-wrap: wrap !important;
+    padding: 10px 0 8px !important;
+    gap: 8px !important;
+  }
+  .dashboard-header-brand {
+    width: 100%;
+    order: 1;
+  }
+  .dashboard-header-controls {
+    width: 100%;
+    order: 2;
+    gap: 6px !important;
+  }
+  .dashboard-header-search {
+    flex: 1 1 auto !important;
+    max-width: none !important;
+  }
+}

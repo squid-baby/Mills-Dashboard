@@ -26,6 +26,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { itemsToRows } from '../../src/lib/inspectionItems.js';
 import { sendStageEmail } from '../../src/lib/sendStageEmail.js';
+import { summarizeRow } from '../../src/config/turnoverOptions.js';
 
 export async function handler(event) {
   if (event.httpMethod !== 'POST') {
@@ -155,19 +156,6 @@ const CONDITION_LABELS = {
 
 const capitalize = s => (s ? s[0].toUpperCase() + s.slice(1) : '');
 
-// Build a human-readable description of an inspection_items row's payload.
-// Paint rows pack location, color, finish — render them all so the email
-// reader has full context. Other categories use whichever identifier field
-// the payload happens to carry.
-function describeRow(category, p) {
-  if (category === 'paint') {
-    const color = p.color === 'Other' && p.customColor ? p.customColor : p.color;
-    const tail = [color, p.finish].filter(Boolean).join(' ');
-    return [p.location, tail].filter(Boolean).join(' · ');
-  }
-  return p.item || p.name || p.type || p.location || category;
-}
-
 async function sendSummaryEmail({ address, inspection, itemRows }) {
   const flagged = itemRows.filter(r => r.needs_this);
   const gather = flagged.filter(r => r.item_type === 'purchase');
@@ -201,32 +189,33 @@ async function sendSummaryEmail({ address, inspection, itemRows }) {
   if (flagged.length > 0) {
     lines.push('', '— Flagged —');
     for (const r of flagged) {
+      // summarizeRow already includes specs (size/type/color/location) for
+      // replacement items, the rating for condition rows, and location+color+finish
+      // for paint. For non-condition rows we append the free-text notes; condition
+      // rows already render the rating in their summary.
+      const summary = summarizeRow(r);
       const p = r.payload || {};
-      const desc = describeRow(r.category, p);
-      // Render condition + spec + notes side-by-side, separated by em dashes.
-      // Previous code used a fallback chain (condition || spec || notes), which
-      // silently dropped the inspector's free-text notes whenever a paint or
-      // condition row also had a condition rating set.
-      const annot = [p.condition, p.spec, p.notes].filter(Boolean).join(' — ');
-      lines.push(`  • [${r.item_type === 'purchase' ? 'Gather' : 'Task'}] ${r.category} — ${desc}${annot ? ` (${annot})` : ''}`);
+      const notes = (r.category !== 'condition' && p.notes) ? ` — ${p.notes}` : '';
+      const bucket = r.item_type === 'purchase' ? 'Gather' : 'Task';
+      lines.push(`  • [${bucket}] ${summary}${notes}`);
     }
   }
   if (paintObs.length > 0) {
     lines.push('', '— Paint —');
     for (const r of paintObs) {
       const p = r.payload || {};
-      const desc = describeRow('paint', p);
-      const annot = [p.condition, p.notes].filter(Boolean).join(' — ');
-      lines.push(`  • ${desc}${annot ? ` (${annot})` : ''}`);
+      const summary = summarizeRow(r);
+      const tail = [p.condition, p.notes].filter(Boolean).join(' — ');
+      lines.push(`  • ${summary}${tail ? ` — ${tail}` : ''}`);
     }
   }
   if (conditionObs.length > 0) {
     lines.push('', '— Condition notes —');
     for (const r of conditionObs) {
       const p = r.payload || {};
-      const desc = describeRow('condition', p);
-      const annot = [p.condition, p.notes].filter(Boolean).join(' — ');
-      lines.push(`  • ${desc}${annot ? ` (${annot})` : ''}`);
+      const summary = summarizeRow(r);
+      const tail = (p.notes || '').trim();
+      lines.push(`  • ${summary}${tail ? ` — ${tail}` : ''}`);
     }
   }
 

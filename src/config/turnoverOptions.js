@@ -9,13 +9,13 @@
  */
 
 // To add/remove options, edit this array — no other code changes needed.
-export const BLIND_WIDTHS = ['23"', '24"', '27"', '29"', '30"', '31"', '34"', '35"', '36"', '46"', '48"', '58"', '60"', '64"', 'Custom'];
+export const BLIND_WIDTHS = ['23"', '24"', '27"', '29"', '30"', '31"', '32"', '34"', '35"', '36"', '39"', '46"', '48"', '58"', '60"', '64"', 'Custom'];
 
 // To add/remove options, edit this array — no other code changes needed.
-export const BLIND_HEIGHTS = ['42"', '64"'];
+export const BLIND_HEIGHTS = ['42"', '64"', '72"'];
 
 // To add/remove options, edit this array — no other code changes needed.
-export const BULB_TYPES = ['A19 E26 (standard)', 'A15 E26 (appliance)', 'B11 E12 (candelabra)', 'BR30 (flood)', 'PAR38 (outdoor)', 'GU10 (track)', 'T8 fluorescent', 'Other'];
+export const BULB_TYPES = ['A19 E26 (standard)', 'A15 E26 (appliance)', 'B11 E12 (candelabra)', 'G25 E26 (vanity globe)', 'BR30 (flood)', 'PAR38 (outdoor)', 'GU10 (track)', 'T8 fluorescent', 'Other'];
 
 // To add/remove options, edit this array — no other code changes needed.
 export const BULB_TEMPS = ['2700K (warm)', '3000K', '4000K (cool)', '5000K (daylight)'];
@@ -54,17 +54,64 @@ export const PAINT_FINISHES = ['Semi-gloss', 'Eggshell', 'Matte'];
 // To add/remove sections or items, edit this array — no other code changes needed.
 // Drives both the Edit form's condition-assessment grouping and the Overview Tasks-by-section grouping.
 export const CONDITION_GROUPS = [
-  { section: 'Walls & ceilings',         items: ['Ceilings', 'Trim & baseboards'] },
+  { section: 'Sheet Rock and Trim',      items: ['Walls', 'Ceilings', 'Trim & baseboards'] },
   { section: 'Flooring',                 items: ['Hardwood / LVP', 'Tile', 'Carpet', 'Thresholds & transitions'] },
-  { section: 'Doors',                    items: ['Interior doors', 'Exterior doors', 'Closet doors & tracks', 'Door weatherstripping', 'Sliding door & track'] },
-  { section: 'Door & cabinet hardware',  items: ['Interior door knobs / levers', 'Deadbolts & exterior locks', 'Cabinet doors & hinges', 'Cabinet knobs & pulls', 'Drawer slides'] },
-  { section: 'Kitchen',                  items: ['Cabinets (boxes & finish)', 'Countertops', 'Sink & faucet', 'Stove / range', 'Range hood & filter', 'Microwave', 'Refrigerator', 'Dishwasher'] },
-  { section: 'Bathroom(s)',              items: ['Vanity & cabinet', 'Vanity light fixture', 'Sink & faucet', 'Toilet', 'Tub / shower surround', 'Shower door / rod', 'Exhaust fan', 'Caulk & grout'] },
+  { section: 'Doors',                    items: [
+    'Interior door',
+    'Interior door hardware',
+    'Exterior doors',
+    'Door weatherstripping',
+    'Deadbolts & exterior locks',
+    'Closet doors & tracks',
+    'Sliding door & track',
+  ]},
+  { section: 'Kitchen',                  items: [
+    'Cabinets (boxes & finish)',
+    'Cabinet doors & hinges',
+    'Cabinet knobs & pulls',
+    'Drawer slides',
+    'Countertops',
+    'Kitchen sink & faucet',
+    'Stove / range', 'Range hood & filter', 'Microwave', 'Refrigerator', 'Dishwasher',
+  ]},
+  { section: 'Bathroom(s)',              items: [
+    'Vanity & cabinet', 'Vanity light fixture',
+    'Bathroom sink & faucet',
+    'Toilet', 'Tub / shower surround', 'Shower door / rod', 'Exhaust fan', 'Caulk & grout',
+  ]},
   { section: 'Lighting & electrical',    items: ['Ceiling fixtures', 'Ceiling fan(s)', 'Recessed lights', 'Under-cabinet lights', 'GFCI outlets (kitchen / bath)'] },
-  { section: 'HVAC & utilities',         items: ['Thermostat', 'HVAC unit / air handler', 'Supply & return vents', 'Water heater', 'Washer hookup', 'Dryer hookup / vent'] },
+  { section: 'HVAC & utilities',         items: ['Thermostat', 'HVAC unit / air handler', 'Supply & return vents', 'Water heater'] },
+  { section: 'Laundry',                  items: ['Washer', 'Dryer'] },
   { section: 'Windows',                  items: ['Window sashes & glass', 'Window screens', 'Window locks & hardware'] },
-  { section: 'Exterior / common',        items: ['Exterior sconces / porch light', 'Mailbox', 'Hose bib', 'Exterior outlets (GFCI)', 'Deck / porch / patio', 'Steps & railing', 'Parking area / carport', 'Shed / storage'] },
+  { section: 'Exterior / common',        items: ['Siding', 'Exterior sconces / porch light', 'Mailbox', 'Hose bib', 'Exterior outlets (GFCI)', 'Deck / porch / patio', 'Steps & railing', 'Parking area / carport', 'Shed / storage'] },
 ];
+
+// Old payload.item strings that may appear in existing inspection_items rows.
+// Map old → new so Overview groups them correctly AND the Edit form surfaces
+// old ratings under the new label (preventing orphaned re-saves).
+// Old 'Sink & faucet' rows can't be split into Kitchen vs Bathroom retroactively —
+// they default to Kitchen, where the inspector can re-rate on the next pass.
+export const LEGACY_CONDITION_LABELS = {
+  'Interior doors':                'Interior door',
+  'Interior door knobs / levers':  'Interior door hardware',
+  'Sink & faucet':                 'Kitchen sink & faucet',
+  'Washer hookup':                 'Washer',
+  'Dryer hookup / vent':           'Dryer',
+};
+
+// Per-item placeholder hints shown in the condition notes textarea.
+// Anything not in this map falls back to a generic "Notes..." placeholder.
+export const CONDITION_HINTS = {
+  'Interior door hardware':     'Brass, Stainless, Black, mixed..?',
+  'Deadbolts & exterior locks': 'Brass, Stainless, Black, mixed..?',
+  'Exterior doors':             'Need paint? Delaminating?',
+  'Cabinets (boxes & finish)':  'White laminated, light wood, dark etc. Notes?',
+  'Drawer slides':              'Are they smooth...?',
+  'Countertops':                'Laminate, stone, tile, etc. Notes?',
+  'Kitchen sink & faucet':      'Stainless, etc. Aerator good?',
+  'Refrigerator':               'Broken parts? Put info in "to order" section.',
+  'Ceiling fan(s)':             'Condition? Need pull cords? Put in "to order" section.',
+};
 
 // To add/remove options, edit this array — no other code changes needed.
 export const OVERALL_CONDITIONS = [
@@ -74,10 +121,12 @@ export const OVERALL_CONDITIONS = [
 ];
 
 // Helper: which CONDITION_GROUPS section a given item belongs to (by item label).
-// Used by Overview to group `condition` rows under their original section.
+// Resolves legacy labels through LEGACY_CONDITION_LABELS so old DB rows still
+// group under a real section instead of falling through to 'Other'.
 export function sectionForConditionItem(itemLabel) {
+  const resolved = LEGACY_CONDITION_LABELS[itemLabel] || itemLabel;
   for (const g of CONDITION_GROUPS) {
-    if (g.items.includes(itemLabel)) return g.section;
+    if (g.items.includes(resolved)) return g.section;
   }
   return 'Other';
 }
@@ -101,7 +150,7 @@ export const CATEGORY_LABELS = {
 export function summarizeRow(row) {
   const p = row.payload || {};
   switch (row.category) {
-    case 'blinds':       return `${p.qty || 1}× Blinds ${p.width || ''} × ${p.height || p.drop || ''}`;
+    case 'blinds':       return `${p.qty || 1}× Blinds ${p.width || ''} × ${p.height || p.drop || ''}${p.location ? ` — ${p.location}` : ''}`;
     case 'bulbs':        return `${p.qty || 1}× ${p.type || 'Bulb'}${p.temp ? ` — ${p.temp}` : ''}`;
     case 'stove_parts':  return `${p.qty || 1}× ${p.type || 'Stove part'}${p.brand ? ` (${p.brand})` : ''}`;
     case 'toilet_seats': return `${p.qty || 1}× Toilet seat — ${p.shape || ''}`;

@@ -554,11 +554,11 @@ export default function App() {
         zIndex: 40,
       }}>
         {/* Top row: Brand + search + calendar button */}
-        <div style={{
+        <div className="dashboard-header-row" style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           padding: '16px 0 12px', gap: 16,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="dashboard-header-brand" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <h1 style={{
               fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em',
               color: 'var(--text-primary)',
@@ -645,8 +645,8 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ position: 'relative', maxWidth: 280, flex: '0 1 280px' }}>
+          <div className="dashboard-header-controls" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="dashboard-header-search" style={{ position: 'relative', maxWidth: 280, flex: '0 1 280px' }}>
               <svg style={{
                 position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
                 width: 14, height: 14, color: 'var(--text-muted)',
