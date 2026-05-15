@@ -7,6 +7,7 @@ import {
   DETECTOR_TYPES, KEY_TYPES,
   PAINT_LOCATIONS, PAINT_COLORS, PAINT_FINISHES,
   CONDITION_GROUPS, OVERALL_CONDITIONS,
+  CONDITION_HINTS, LEGACY_CONDITION_LABELS,
   sectionForConditionItem, CATEGORY_LABELS, summarizeRow,
 } from '../config/turnoverOptions';
 import TurnoverStageModal from './TurnoverStageModal';
@@ -184,7 +185,8 @@ export default function TurnoverTab({ unit, accentColor, onOpenWorklist }) {
               setConditions(prev => {
                 const merged = { ...prev };
                 for (const [k, v] of Object.entries(d.items.conditions)) {
-                  merged[k] = { condition: null, notes: '', needs_this: false, ...v };
+                  const key = LEGACY_CONDITION_LABELS[k] || k;
+                  merged[key] = { condition: null, notes: '', needs_this: false, ...(merged[key] || {}), ...v };
                 }
                 return merged;
               });
@@ -521,6 +523,9 @@ function TurnoverOverview({
 
       {/* Gather */}
       <div style={sectionTitleStyle}>Gather — to bring on-site</div>
+      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: -8, marginBottom: 12 }}>
+        Items to order or bring with you.
+      </div>
       {gatherRows.length === 0 ? (
         <div style={{ ...itemBlockStyle, fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic' }}>
           Nothing flagged to gather. Open Edit and toggle <em>Need</em> on items the worker should bring.
@@ -540,6 +545,9 @@ function TurnoverOverview({
 
       {/* Tasks */}
       <div style={sectionTitleStyle}>Tasks — work on-site</div>
+      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: -8, marginBottom: 12 }}>
+        Work to complete during the turnover.
+      </div>
       {taskRows.length === 0 ? (
         <div style={{ ...itemBlockStyle, fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic' }}>
           No tasks flagged. Toggle <em>Need</em> on a condition item, paint area, or custom task to add it here.
@@ -703,14 +711,21 @@ function TurnoverEdit(props) {
       {/* Blinds */}
       <ReplacementBlock title="Blinds">
         {blinds.map((b, i) => (
-          <RowGrid key={i}>
-            <Field label="Width"><Select value={b.width} options={BLIND_WIDTHS} onChange={v => updateList(setBlinds, i, 'width', v)} /></Field>
-            <Field label="Height"><Select value={b.height || b.drop} options={BLIND_HEIGHTS} onChange={v => updateList(setBlinds, i, 'height', v)} /></Field>
-            <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={b.qty} onChange={e => updateList(setBlinds, i, 'qty', +e.target.value)} /></Field>
-            <NeedToggle value={!!b.needs_this} onChange={v => setNeed(setBlinds, i, v)} />
-          </RowGrid>
+          <div key={i} style={{ marginBottom: 10 }}>
+            <RowGrid columns="1fr 1fr auto auto">
+              <Field label="Width"><Select value={b.width} options={BLIND_WIDTHS} onChange={v => updateList(setBlinds, i, 'width', v)} /></Field>
+              <Field label="Height"><Select value={b.height || b.drop} options={BLIND_HEIGHTS} onChange={v => updateList(setBlinds, i, 'height', v)} /></Field>
+              <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={b.qty} onFocus={e => e.target.select()} onChange={e => updateList(setBlinds, i, 'qty', Math.max(1, +e.target.value || 1))} /></Field>
+              <NeedToggle label="Order" value={!!b.needs_this} onChange={v => setNeed(setBlinds, i, v)} />
+            </RowGrid>
+            <Field label="Location">
+              <input style={inputStyle} value={b.location || ''}
+                onChange={e => updateList(setBlinds, i, 'location', e.target.value)}
+                placeholder="e.g. Living room front window" />
+            </Field>
+          </div>
         ))}
-        <button style={addBtnStyle} onClick={() => setBlinds(p => [...p, { width: blindDefault.width, height: blindDefault.height, qty: 1, needs_this: false }])}>+ add window</button>
+        <button style={addBtnStyle} onClick={() => setBlinds(p => [...p, { width: blindDefault.width, height: blindDefault.height, location: '', qty: 1, needs_this: true }])}>+ add window</button>
       </ReplacementBlock>
 
       {/* Light bulbs */}
@@ -719,11 +734,11 @@ function TurnoverEdit(props) {
           <RowGrid key={i}>
             <Field label="Type"><Select value={b.type} options={BULB_TYPES} onChange={v => updateList(setBulbs, i, 'type', v)} /></Field>
             <Field label="Temp"><Select value={b.temp} options={BULB_TEMPS} onChange={v => updateList(setBulbs, i, 'temp', v)} /></Field>
-            <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={b.qty} onChange={e => updateList(setBulbs, i, 'qty', +e.target.value)} /></Field>
-            <NeedToggle value={!!b.needs_this} onChange={v => setNeed(setBulbs, i, v)} />
+            <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={b.qty} onFocus={e => e.target.select()} onChange={e => updateList(setBulbs, i, 'qty', Math.max(1, +e.target.value || 1))} /></Field>
+            <NeedToggle label="Order" value={!!b.needs_this} onChange={v => setNeed(setBulbs, i, v)} />
           </RowGrid>
         ))}
-        <button style={addBtnStyle} onClick={() => setBulbs(p => [...p, { type: BULB_TYPES[0], temp: BULB_TEMPS[0], qty: 1, needs_this: false }])}>+ add type</button>
+        <button style={addBtnStyle} onClick={() => setBulbs(p => [...p, { type: BULB_TYPES[0], temp: BULB_TEMPS[0], qty: 1, needs_this: true }])}>+ add type</button>
       </ReplacementBlock>
 
       {/* Stove parts */}
@@ -732,11 +747,11 @@ function TurnoverEdit(props) {
           <RowGrid key={i}>
             <Field label="Type"><Select value={s.type} options={STOVE_TYPES} onChange={v => updateList(setStoveParts, i, 'type', v)} /></Field>
             <Field label="Brand"><input style={inputStyle} value={s.brand} onChange={e => updateList(setStoveParts, i, 'brand', e.target.value)} placeholder="GE, Whirlpool..." /></Field>
-            <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={s.qty} onChange={e => updateList(setStoveParts, i, 'qty', +e.target.value)} /></Field>
-            <NeedToggle value={!!s.needs_this} onChange={v => setNeed(setStoveParts, i, v)} />
+            <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={s.qty} onFocus={e => e.target.select()} onChange={e => updateList(setStoveParts, i, 'qty', Math.max(1, +e.target.value || 1))} /></Field>
+            <NeedToggle label="Order" value={!!s.needs_this} onChange={v => setNeed(setStoveParts, i, v)} />
           </RowGrid>
         ))}
-        <button style={addBtnStyle} onClick={() => setStoveParts(p => [...p, { type: STOVE_TYPES[0], brand: '', qty: 1, needs_this: false }])}>+ add item</button>
+        <button style={addBtnStyle} onClick={() => setStoveParts(p => [...p, { type: STOVE_TYPES[0], brand: '', qty: 1, needs_this: true }])}>+ add item</button>
       </ReplacementBlock>
 
       {/* Toilet seats */}
@@ -744,11 +759,11 @@ function TurnoverEdit(props) {
         {toiletSeats.map((t, i) => (
           <RowGrid key={i} columns="1fr auto auto">
             <Field label="Bowl shape"><Select value={t.shape} options={BOWL_SHAPES} onChange={v => updateList(setToiletSeats, i, 'shape', v)} /></Field>
-            <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={t.qty} onChange={e => updateList(setToiletSeats, i, 'qty', +e.target.value)} /></Field>
-            <NeedToggle value={!!t.needs_this} onChange={v => setNeed(setToiletSeats, i, v)} />
+            <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={t.qty} onFocus={e => e.target.select()} onChange={e => updateList(setToiletSeats, i, 'qty', Math.max(1, +e.target.value || 1))} /></Field>
+            <NeedToggle label="Order" value={!!t.needs_this} onChange={v => setNeed(setToiletSeats, i, v)} />
           </RowGrid>
         ))}
-        <button style={addBtnStyle} onClick={() => setToiletSeats(p => [...p, { shape: 'Round', qty: 1, needs_this: false }])}>+ add</button>
+        <button style={addBtnStyle} onClick={() => setToiletSeats(p => [...p, { shape: 'Round', qty: 1, needs_this: true }])}>+ add</button>
       </ReplacementBlock>
 
       {/* Outlet covers */}
@@ -758,11 +773,11 @@ function TurnoverEdit(props) {
             <Field label="Type"><Select value={o.type} options={OUTLET_TYPES} onChange={v => updateList(setOutlets, i, 'type', v)} /></Field>
             <Field label="Color"><Select value={o.color} options={OUTLET_COLORS} onChange={v => updateList(setOutlets, i, 'color', v)} /></Field>
             <Field label="Gang"><Select value={o.gang} options={OUTLET_GANGS} onChange={v => updateList(setOutlets, i, 'gang', v)} /></Field>
-            <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={o.qty} onChange={e => updateList(setOutlets, i, 'qty', +e.target.value)} /></Field>
-            <NeedToggle value={!!o.needs_this} onChange={v => setNeed(setOutlets, i, v)} />
+            <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={o.qty} onFocus={e => e.target.select()} onChange={e => updateList(setOutlets, i, 'qty', Math.max(1, +e.target.value || 1))} /></Field>
+            <NeedToggle label="Order" value={!!o.needs_this} onChange={v => setNeed(setOutlets, i, v)} />
           </RowGrid>
         ))}
-        <button style={addBtnStyle} onClick={() => setOutlets(p => [...p, { type: OUTLET_TYPES[0], color: outletDefaultColor, gang: '1-gang', qty: 1, needs_this: false }])}>+ add type</button>
+        <button style={addBtnStyle} onClick={() => setOutlets(p => [...p, { type: OUTLET_TYPES[0], color: outletDefaultColor, gang: '1-gang', qty: 1, needs_this: true }])}>+ add type</button>
       </ReplacementBlock>
 
       {/* Smoke / CO detectors */}
@@ -770,11 +785,11 @@ function TurnoverEdit(props) {
         {detectors.map((d, i) => (
           <RowGrid key={i} columns="1fr auto auto">
             <Field label="Type"><Select value={d.type} options={DETECTOR_TYPES} onChange={v => updateList(setDetectors, i, 'type', v)} /></Field>
-            <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={d.qty} onChange={e => updateList(setDetectors, i, 'qty', +e.target.value)} /></Field>
-            <NeedToggle value={!!d.needs_this} onChange={v => setNeed(setDetectors, i, v)} />
+            <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={d.qty} onFocus={e => e.target.select()} onChange={e => updateList(setDetectors, i, 'qty', Math.max(1, +e.target.value || 1))} /></Field>
+            <NeedToggle label="Order" value={!!d.needs_this} onChange={v => setNeed(setDetectors, i, v)} />
           </RowGrid>
         ))}
-        <button style={addBtnStyle} onClick={() => setDetectors(p => [...p, { type: DETECTOR_TYPES[0], qty: 1, needs_this: false }])}>+ add type</button>
+        <button style={addBtnStyle} onClick={() => setDetectors(p => [...p, { type: DETECTOR_TYPES[0], qty: 1, needs_this: true }])}>+ add type</button>
       </ReplacementBlock>
 
       {/* Keys / fobs */}
@@ -782,9 +797,9 @@ function TurnoverEdit(props) {
         {keys.map((k, i) => (
           <RowGrid key={i} columns="1fr auto auto auto">
             <Field label="Type"><Select value={k.type} options={KEY_TYPES} onChange={v => updateList(setKeys, i, 'type', v)} /></Field>
-            <Field label="Returned"><input type="number" min="0" style={qtyStyle} value={k.returned} onChange={e => updateList(setKeys, i, 'returned', +e.target.value)} /></Field>
-            <Field label="Missing"><input type="number" min="0" style={qtyStyle} value={k.missing} onChange={e => updateList(setKeys, i, 'missing', +e.target.value)} /></Field>
-            <NeedToggle value={!!k.needs_this} onChange={v => setNeed(setKeys, i, v)} />
+            <Field label="Returned"><input type="number" min="0" style={qtyStyle} value={k.returned} onFocus={e => e.target.select()} onChange={e => updateList(setKeys, i, 'returned', Math.max(0, +e.target.value || 0))} /></Field>
+            <Field label="Missing"><input type="number" min="0" style={qtyStyle} value={k.missing} onFocus={e => e.target.select()} onChange={e => updateList(setKeys, i, 'missing', Math.max(0, +e.target.value || 0))} /></Field>
+            <NeedToggle label="Order" value={!!k.needs_this} onChange={v => setNeed(setKeys, i, v)} />
           </RowGrid>
         ))}
         <button style={addBtnStyle} onClick={() => setKeys(p => [...p, { type: 'Door key', returned: 0, missing: 0, needs_this: false }])}>+ add type</button>
@@ -797,8 +812,8 @@ function TurnoverEdit(props) {
             <RowGrid columns="1fr 1fr auto auto">
               <Field label="Item"><input style={inputStyle} value={c.name} onChange={e => updateList(setCustomItems, i, 'name', e.target.value)} placeholder="Name" /></Field>
               <Field label="Spec / size"><input style={inputStyle} value={c.spec} onChange={e => updateList(setCustomItems, i, 'spec', e.target.value)} placeholder="Detail" /></Field>
-              <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={c.qty} onChange={e => updateList(setCustomItems, i, 'qty', +e.target.value)} /></Field>
-              <NeedToggle value={!!c.needs_this} onChange={v => setNeed(setCustomItems, i, v)} />
+              <Field label="Qty"><input type="number" min="1" style={qtyStyle} value={c.qty} onFocus={e => e.target.select()} onChange={e => updateList(setCustomItems, i, 'qty', Math.max(1, +e.target.value || 1))} /></Field>
+              <NeedToggle label={c.purchaseNeeded === false ? 'Task' : 'Order'} value={!!c.needs_this} onChange={v => setNeed(setCustomItems, i, v)} />
             </RowGrid>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)' }}>
               <span>Goes under:</span>
@@ -813,10 +828,17 @@ function TurnoverEdit(props) {
             </div>
           </div>
         ))}
-        <button style={addBtnStyle} onClick={() => setCustomItems(p => [...p, { name: '', spec: '', qty: 1, needs_this: false, purchaseNeeded: true }])}>+ add item</button>
+        <button style={addBtnStyle} onClick={() => setCustomItems(p => [...p, { name: '', spec: '', qty: 1, needs_this: true, purchaseNeeded: true }])}>+ add item</button>
       </ReplacementBlock>
 
       <div style={dividerStyle} />
+
+      <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text-primary)', marginTop: 8, marginBottom: 4 }}>
+        Property Condition — To-Do List
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 16 }}>
+        Tap <em>Update now</em> to add a condition item to the worker checklist. <em>Good</em> clears it; <em>Next turn</em> notes it for later.
+      </div>
 
       {/* Paint */}
       <div style={sectionTitleStyle}>Paint</div>
@@ -834,20 +856,20 @@ function TurnoverEdit(props) {
               </Field>
             </div>
           )}
-          <ConditionButtons value={p.condition} onChange={v => updateList(setPaintRows, i, 'condition', v)} />
+          <ConditionButtons
+            value={p.condition}
+            onChange={v => setPaintRows(prev => prev.map((row, idx) => idx === i ? {
+              ...row,
+              condition: v,
+              needs_this: v === 'now',
+            } : row))}
+          />
           <textarea style={notesFieldStyle} rows="1" value={p.notes || ''} onChange={e => updateList(setPaintRows, i, 'notes', e.target.value)} placeholder="Notes..." />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
-            <NeedToggle value={!!p.needs_this} onChange={v => setNeed(setPaintRows, i, v)} />
-          </div>
         </div>
       ))}
       <button style={addBtnStyle} onClick={() => setPaintRows(p => [...p, { location: 'Living room', color: 'White', finish: 'Semi-gloss', condition: null, notes: '', customColor: '', needs_this: false }])}>+ add area</button>
 
       <div style={dividerStyle} />
-
-      {/* Condition assessment */}
-      <div style={sectionTitleStyle}>Condition Assessment</div>
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 16 }}>Good / update next turn / update now. Toggle <em>Need</em> to add to the worker checklist.</div>
 
       {CONDITION_GROUPS.map(group => (
         <div key={group.section} style={{ marginBottom: 20 }}>
@@ -858,22 +880,26 @@ function TurnoverEdit(props) {
             const c = conditions[item] || { condition: null, notes: '', needs_this: false };
             return (
               <div key={item} style={{ ...itemBlockStyle, marginBottom: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{item}</div>
-                  <NeedToggle
-                    value={!!c.needs_this}
-                    onChange={v => setConditions(prev => ({ ...prev, [item]: { ...c, needs_this: v } }))}
-                  />
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>{item}</div>
                 <ConditionButtons
                   value={c.condition}
-                  onChange={v => setConditions(prev => ({ ...prev, [item]: { ...c, condition: v } }))}
+                  onChange={v => setConditions(prev => {
+                    const cur = prev[item] || { condition: null, notes: '', needs_this: false };
+                    return {
+                      ...prev,
+                      [item]: {
+                        ...cur,
+                        condition: v,
+                        needs_this: v === 'now',
+                      },
+                    };
+                  })}
                 />
                 <textarea
                   style={notesFieldStyle} rows="1"
                   value={c.notes || ''}
                   onChange={e => setConditions(prev => ({ ...prev, [item]: { ...c, notes: e.target.value } }))}
-                  placeholder="Notes..."
+                  placeholder={CONDITION_HINTS[item] || 'Notes...'}
                 />
               </div>
             );
@@ -995,7 +1021,7 @@ function ConditionButtons({ value, onChange }) {
   );
 }
 
-function NeedToggle({ value, onChange }) {
+function NeedToggle({ value, onChange, label = 'Need' }) {
   return (
     <button
       onClick={() => onChange(!value)}
@@ -1007,7 +1033,7 @@ function NeedToggle({ value, onChange }) {
         color: value ? '#3B6D11' : 'var(--text-muted)',
       }}
     >
-      {value ? '✓ Need' : 'Need?'}
+      {value ? `✓ ${label}` : `${label}?`}
     </button>
   );
 }
