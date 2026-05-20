@@ -151,13 +151,16 @@ export default function CalendarView({ units, theme, themeButton, onBack, onView
     return map;
   }, [tasksByAddress, ghostTasks, dismissedGhosts]);
 
-  // Units that have tasks or are in turnover (sorted by address)
+  // Units with at least one task (real or ghost) overlapping the visible window
   const calendarUnits = useMemo(() => {
-    const addressSet = new Set([
-      ...turnoverUnits.map(u => u.address),
-      ...Object.keys(allTasksByAddress),
-    ]);
-    return [...addressSet].sort().map(addr => {
+    const { start, end } = fetchRange;
+    const addresses = new Set();
+    for (const [addr, list] of Object.entries(allTasksByAddress)) {
+      if (list.some(t => t.start_date <= end && t.end_date >= start)) {
+        addresses.add(addr);
+      }
+    }
+    return [...addresses].sort().map(addr => {
       const unit = units.find(u => u.address === addr);
       return {
         address: addr,
@@ -169,7 +172,7 @@ export default function CalendarView({ units, theme, themeButton, onBack, onView
         leaseEnd: unit?.leaseEnd || '',
       };
     });
-  }, [turnoverUnits, allTasksByAddress, units]);
+  }, [allTasksByAddress, fetchRange, units]);
 
   // Navigation — adapts to zoom level
   const navigate = (dir) => {
