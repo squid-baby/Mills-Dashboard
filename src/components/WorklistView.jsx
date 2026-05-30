@@ -37,6 +37,7 @@ export default function WorklistView({ initialAddress, onBack, themeButton }) {
   const [loading, setLoading] = useState(true);
   const [filterAddress, setFilterAddress] = useState(initialAddress || '');
   const [error, setError] = useState(null);
+  const [groupBy, setGroupBy] = useState('category'); // 'category' | 'property'
 
   useEffect(() => { fetchRows(); }, []);
 
@@ -147,6 +148,29 @@ export default function WorklistView({ initialAddress, onBack, themeButton }) {
             <option value="">All properties ({allAddresses.length})</option>
             {allAddresses.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
+          <div style={{ display: 'flex', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+            {[
+              { key: 'category', label: 'By category' },
+              { key: 'property', label: 'By property' },
+            ].map(opt => {
+              const active = groupBy === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setGroupBy(opt.key)}
+                  style={{
+                    padding: '6px 10px', fontSize: 11, fontWeight: 600,
+                    background: active ? 'var(--bg-surface)' : 'var(--bg-elevated)',
+                    color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+                    border: 'none', borderRight: opt.key === 'category' ? '1px solid var(--border-default)' : 'none',
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
           <button onClick={exportCsv}          style={exportBtnStyle}>Export CSV</button>
           <button onClick={exportShoppingList} style={exportBtnStyle}>Shopping List</button>
           {filterAddress && (
@@ -174,7 +198,7 @@ export default function WorklistView({ initialAddress, onBack, themeButton }) {
       {gather.length === 0 ? (
         <EmptyHint>Nothing flagged to gather. Toggle <em>Need</em> on a row in any property's Turnover Edit form.</EmptyHint>
       ) : (
-        renderGather(gather, filterAddress, toggleRowField)
+        renderGather(gather, filterAddress, toggleRowField, groupBy)
       )}
 
       <div style={{ height: 24 }} />
@@ -184,14 +208,39 @@ export default function WorklistView({ initialAddress, onBack, themeButton }) {
       {tasks.length === 0 ? (
         <EmptyHint>No tasks flagged.</EmptyHint>
       ) : (
-        renderTasks(tasks, filterAddress, toggleRowField)
+        renderTasks(tasks, filterAddress, toggleRowField, groupBy)
       )}
     </div>
   );
 }
 
-function renderGather(gather, filterAddress, toggleRowField) {
-  // Group by category. Within each category, sort by address for predictable rendering.
+function renderGather(gather, filterAddress, toggleRowField, groupBy) {
+  if (groupBy === 'property' && !filterAddress) {
+    const byAddress = {};
+    for (const r of gather) {
+      const k = r.unit_address || '(no address)';
+      if (!byAddress[k]) byAddress[k] = [];
+      byAddress[k].push(r);
+    }
+    return Object.keys(byAddress).sort().map(addr => (
+      <div key={addr} style={{ marginBottom: 16 }}>
+        <div style={groupTitleStyle}>{addr}</div>
+        {byAddress[addr]
+          .slice()
+          .sort((a, b) => (a.category || '').localeCompare(b.category || ''))
+          .map(row => (
+            <GatherRow
+              key={row.id}
+              row={row}
+              subLabel={CATEGORY_LABELS[row.category] || row.category}
+              onToggle={toggleRowField}
+            />
+          ))}
+      </div>
+    ));
+  }
+
+  // Default: group by category. Within each category, sort by address.
   const byCategory = {};
   for (const r of gather) {
     if (!byCategory[r.category]) byCategory[r.category] = [];
@@ -204,19 +253,59 @@ function renderGather(gather, filterAddress, toggleRowField) {
       {byCategory[cat]
         .slice()
         .sort((a, b) => (a.unit_address || '').localeCompare(b.unit_address || ''))
-        .map(row => <GatherRow key={row.id} row={row} showAddress={!filterAddress} onToggle={toggleRowField} />)}
+        .map(row => (
+          <GatherRow
+            key={row.id}
+            row={row}
+            subLabel={!filterAddress ? row.unit_address : null}
+            onToggle={toggleRowField}
+          />
+        ))}
     </div>
   ));
 }
 
-function renderTasks(tasks, filterAddress, toggleRowField) {
-  // Group by section, then by unit_address inside each section
+function renderTasks(tasks, filterAddress, toggleRowField, groupBy) {
+  function sectionOf(r) {
+    if (r.category === 'condition') return sectionForConditionItem(r.payload?.item);
+    if (r.category === 'paint')     return 'Paint';
+    return 'Other tasks';
+  }
+
+  if (groupBy === 'property' && !filterAddress) {
+    const byAddress = {};
+    for (const r of tasks) {
+      const k = r.unit_address || '(no address)';
+      if (!byAddress[k]) byAddress[k] = [];
+      byAddress[k].push(r);
+    }
+    return Object.keys(byAddress).sort().map(addr => {
+      const bySection = {};
+      for (const r of byAddress[addr]) {
+        const key = sectionOf(r);
+        if (!bySection[key]) bySection[key] = [];
+        bySection[key].push(r);
+      }
+      return (
+        <div key={addr} style={{ marginBottom: 18 }}>
+          <div style={groupTitleStyle}>{addr}</div>
+          {Object.entries(bySection)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([section, rs]) => (
+              <div key={section} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4, fontWeight: 600 }}>{section}</div>
+                {rs.map(row => <TaskRow key={row.id} row={row} onToggle={toggleRowField} />)}
+              </div>
+            ))}
+        </div>
+      );
+    });
+  }
+
+  // Default: group by section, then by unit_address inside each section.
   const bySection = {};
   for (const r of tasks) {
-    let key;
-    if (r.category === 'condition')   key = sectionForConditionItem(r.payload?.item);
-    else if (r.category === 'paint')  key = 'Paint';
-    else                              key = 'Other tasks';
+    const key = sectionOf(r);
     if (!bySection[key]) bySection[key] = [];
     bySection[key].push(r);
   }
@@ -245,7 +334,7 @@ function renderTasks(tasks, filterAddress, toggleRowField) {
   });
 }
 
-function GatherRow({ row, showAddress, onToggle }) {
+function GatherRow({ row, subLabel, onToggle }) {
   const gathered = !!row.gathered_at;
   const done = !!row.done_at;
   return (
@@ -256,8 +345,8 @@ function GatherRow({ row, showAddress, onToggle }) {
         textDecoration: done ? 'line-through' : 'none',
       }}>
         {summarizeRow(row)}
-        {showAddress && (
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{row.unit_address}</div>
+        {subLabel && (
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{subLabel}</div>
         )}
       </div>
       <Checkbox label="Gathered" checked={gathered} onChange={v => onToggle(row.id, 'gathered_at', v)} />
